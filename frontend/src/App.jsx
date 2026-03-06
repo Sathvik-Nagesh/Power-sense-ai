@@ -40,6 +40,7 @@ export default function App() {
   const [speed, setSpeed] = useState(1)
   const [expanded, setExpanded] = useState(null)
   const [isMuted, setIsMuted] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(true)
   const timerRef = useRef(null)
 
   const fetchAll = useCallback(async () => {
@@ -302,31 +303,34 @@ export default function App() {
         </div>
 
         {/* AI FORECAST PANEL — floats above the right room column */}
-        <AiForecastPanel preds={preds} simHour={simHour} />
+        <AiForecastPanel preds={preds} simHour={simHour} speed={speed} />
 
-        {/* RIGHT PANEL - Floating Room List */}
-        <div className="ui-rooms panel glass-panel">
-          <div className="panel__head">
+        {/* RIGHT PANEL - Collapsible Room List */}
+        <div className={`ui-rooms panel glass-panel ${panelOpen ? '' : 'panel--collapsed'}`}>
+          <div className="panel__head" style={{ cursor: 'pointer' }} onClick={() => setPanelOpen(o => !o)}>
             <div className="panel__title"><span className="ico">🏫</span>Campus Sectors</div>
             <div className="panel__badge green">{activeRooms} Active</div>
+            <span className="panel__chevron" style={{ marginLeft: 8, fontSize: '0.7rem', color: 'var(--t3)', transition: 'transform 0.25s', display: 'inline-block', transform: panelOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▼</span>
           </div>
-          <div className="panel__body" style={{ paddingTop: 12, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <div className="room-list holographic-scroll">
-              {rooms.map(room => (
-                <ClassroomCard
-                  key={room.id}
-                  room={room}
-                  pred={predMap[room.id]}
-                  energy={energyMap[room.id]}
-                  timetable={TIMETABLES[room.id] || []}
-                  simHour={simHour}
-                  expanded={expanded === room.id}
-                  onToggle={() => setExpanded(expanded === room.id ? null : room.id)}
-                  onOverride={override}
-                />
-              ))}
+          {panelOpen && (
+            <div className="panel__body" style={{ paddingTop: 8, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div className="room-list holographic-scroll">
+                {rooms.map(room => (
+                  <ClassroomCard
+                    key={room.id}
+                    room={room}
+                    pred={predMap[room.id]}
+                    energy={energyMap[room.id]}
+                    timetable={TIMETABLES[room.id] || []}
+                    simHour={simHour}
+                    expanded={expanded === room.id}
+                    onToggle={() => setExpanded(expanded === room.id ? null : room.id)}
+                    onOverride={override}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Alert Ticker — bottom center */}

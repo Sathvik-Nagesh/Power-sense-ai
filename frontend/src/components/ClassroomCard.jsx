@@ -83,43 +83,22 @@ export default function ClassroomCard({
     return (
         <div className={`rc ${cls} ${expanded ? 'expanded' : ''}`}>
 
-            {/* SUMMARY ROW — always visible */}
+            {/* Summary row */}
             <div className="rc__summary" onClick={() => { playSelect(); onToggle() }}>
                 <span className="rc__led" />
                 <span className="rc__id">{room.id}</span>
                 <span className="rc__name">{room.name}</span>
 
-                {/* WiFi bars */}
-                <WifiSignal devices={wifiDevices} capacity={room.capacity} />
-
-                {/* Schedule dot */}
+                {/* inline quick stats */}
+                <span className="rc__inline-kw">⚡{room.current_power_kw?.toFixed(1)}kW</span>
                 {hasActiveSlot && (
-                    <span style={{ fontSize: '.62rem', color: 'var(--c-cyan)', fontWeight: 700, marginLeft: 2 }}
-                        title="Class in session">📅</span>
+                    <span style={{ fontSize: '.6rem', color: 'var(--c-cyan)' }} title="Class in session">📅</span>
                 )}
 
                 <span className="rc__badge">
                     {cls === 'occ' ? '● Active' : cls === 'warn' ? '⚠ Emptying' : '○ Empty'}
                 </span>
-            </div>
-
-            {/* MINI STATS — always visible */}
-            <div className="rc__mini">
-                <div className="rc__mini-item">
-                    👤 <span>{room.student_count}</span>/{room.capacity}
-                </div>
-                <div className="rc__mini-item">
-                    ⚡ <span>{room.current_power_kw?.toFixed(1)} kW</span>
-                </div>
-                <div className="rc__mini-item">
-                    📶 <span>{wifiDevices}</span> devices
-                </div>
-                <div className="rc__mini-item" style={{ marginLeft: 'auto' }}>
-                    <span style={{ color: predNow > 60 ? 'var(--c-green)' : predNow > 30 ? 'var(--c-yellow)' : 'var(--c-red)' }}>
-                        {predNow}%
-                    </span>
-                    &nbsp;→ {pred30}%
-                </div>
+                <span className="rc__chevron">{expanded ? '▲' : '▼'}</span>
             </div>
 
             {/* EXPANDED DETAIL */}

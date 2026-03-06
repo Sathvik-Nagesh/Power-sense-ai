@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
  * AI Forecast Panel — shows upcoming power-down predictions
  * with decrementing real-time seconds countdowns and probability bars.
  */
-export default function AiForecastPanel({ preds = [], simHour = 12 }) {
+export default function AiForecastPanel({ preds = [], simHour = 12, speed = 1 }) {
     // Rooms predicted to go empty, sorted by soonest first
     const upcoming = preds
         .filter(p => p.predicted_empty_minutes != null && p.status !== 'empty')
@@ -33,19 +33,19 @@ export default function AiForecastPanel({ preds = [], simHour = 12 }) {
         prevPreds.current = Object.fromEntries(preds.map(p => [p.room, p]))
     }, [preds])
 
-    // Decrement every second
+    // Decrement every second — but subtract `speed` seconds to match sim pace
     useEffect(() => {
         const timer = setInterval(() => {
             setCountdowns(prev => {
                 const next = {}
                 Object.entries(prev).forEach(([room, secs]) => {
-                    next[room] = Math.max(0, secs - 1)
+                    next[room] = Math.max(0, secs - speed)
                 })
                 return next
             })
         }, 1000)
         return () => clearInterval(timer)
-    }, [])
+    }, [speed])
 
     const fmt = (secs) => {
         if (secs <= 0) return '00:00'
