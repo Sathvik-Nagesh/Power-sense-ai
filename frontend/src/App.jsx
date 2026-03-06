@@ -4,6 +4,8 @@ import CampusMap3D from './components/CampusMap3D'
 import ClassroomCard from './components/ClassroomCard'
 import EnergyDashboard from './components/EnergyDashboard'
 import EnergyHeatmap from './components/EnergyHeatmap'
+import AlertTicker from './components/AlertTicker'
+import { playOverride, playPowerDown, playPowerUp, startAmbient } from './utils/audio'
 
 const API = 'http://localhost:8000/api'
 
@@ -85,6 +87,7 @@ export default function App() {
   }, [fetchAll])
 
   const override = useCallback(async (id, active) => {
+    playOverride()
     try {
       await fetch(`${API}/override`, {
         method: 'POST',
@@ -264,7 +267,13 @@ export default function App() {
           </div>
         </div>
 
+        {/* Alert Ticker — bottom center */}
+        <AlertTicker rooms={rooms} preds={preds} />
+
       </div>
+
+      {/* Start ambient hum on first interaction */}
+      <div className="ambient-trigger" onClick={() => startAmbient()} onTouchStart={() => startAmbient()} />
     </div>
   )
 }

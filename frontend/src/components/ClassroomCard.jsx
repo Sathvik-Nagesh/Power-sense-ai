@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { playSelect } from '../utils/audio'
 
 // Maps room id to class slot labels
 const SLOT_LABELS = {
@@ -83,7 +84,7 @@ export default function ClassroomCard({
         <div className={`rc ${cls} ${expanded ? 'expanded' : ''}`}>
 
             {/* SUMMARY ROW — always visible */}
-            <div className="rc__summary" onClick={onToggle}>
+            <div className="rc__summary" onClick={() => { playSelect(); onToggle() }}>
                 <span className="rc__led" />
                 <span className="rc__id">{room.id}</span>
                 <span className="rc__name">{room.name}</span>
