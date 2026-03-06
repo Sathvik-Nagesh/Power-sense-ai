@@ -393,8 +393,9 @@ button {
 .room-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-bottom: 20px;
+  gap: 5px;
+  /* was 10px — tighter list */
+  padding-bottom: 16px;
 }
 
 .rc {
@@ -430,8 +431,9 @@ button {
 .rc__summary {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 8px 10px;
+  /* was 10px 12px */
 }
 
 .rc__led {
@@ -493,18 +495,31 @@ button {
   color: var(--c-red);
 }
 
-.rc__mini {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 12px 10px;
-  font-size: .65rem;
-  color: var(--t3);
+/* NEW compact elements */
+.rc__inline-kw {
+  font-size: .62rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--c-cyan);
+  opacity: 0.8;
 }
 
-.rc__mini span {
-  color: var(--t1);
-  font-weight: 600;
+.rc__chevron {
+  font-size: .55rem;
+  color: var(--t3);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Collapsed panel state */
+.panel--collapsed {
+  height: auto !important;
+  bottom: auto !important;
+  /* overrides .ui-rooms strech */
+  overflow: hidden;
+}
+
+.panel--collapsed .panel__body {
+  display: none;
 }
 
 .wifi-bars {
