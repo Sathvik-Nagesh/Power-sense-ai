@@ -99,20 +99,32 @@ export default function App() {
   }, [fetchAll])
 
   const setTime = useCallback(async (hours) => {
-    // Reset date to today at specific hour
-    const d = new Date()
-    d.setHours(hours, 0, 0, 0)
     try {
       await fetch(`${API}/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'set_time', time_iso: d.toISOString() }),
+        body: JSON.stringify({ action: 'set_time', hour: hours }),
       })
       fetchAll()
     } catch (e) { }
   }, [fetchAll])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+
+  // Start ambient audio on first click
+  useEffect(() => {
+    const initAudio = () => {
+      startAmbient()
+      window.removeEventListener('click', initAudio)
+      window.removeEventListener('touchstart', initAudio)
+    }
+    window.addEventListener('click', initAudio)
+    window.addEventListener('touchstart', initAudio)
+    return () => {
+      window.removeEventListener('click', initAudio)
+      window.removeEventListener('touchstart', initAudio)
+    }
+  }, [])
 
   useEffect(() => {
     if (isPlaying) {
@@ -271,9 +283,6 @@ export default function App() {
         <AlertTicker rooms={rooms} preds={preds} />
 
       </div>
-
-      {/* Start ambient hum on first interaction */}
-      <div className="ambient-trigger" onClick={() => startAmbient()} onTouchStart={() => startAmbient()} />
     </div>
   )
 }

@@ -833,7 +833,7 @@ button {
   font-family: 'JetBrains Mono', monospace;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  animation: ticker-slide-in 0.4s ease-out both;
+  animation: ticker-slide-in 0.4s ease-out both, ticker-fade-out 0.4s ease-in 3.6s forwards;
   border: 1px solid;
 }
 
@@ -846,6 +846,13 @@ button {
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+@keyframes ticker-fade-out {
+  to {
+    transform: translateY(-10px);
+    opacity: 0;
   }
 }
 

@@ -55,6 +55,7 @@ class SimulationControl(BaseModel):
     action: str  # "play", "pause", "step", "reset", "set_time"
     speed: Optional[int] = 1
     time_iso: Optional[str] = None
+    hour: Optional[int] = None
 
 
 # --- API Endpoints ---
@@ -127,13 +128,14 @@ def simulate_step(control: Optional[SimulationControl] = None):
             simulation.step()
         elif control.action == "pause":
             simulation.is_running = False
-        elif control.action == "reset":
-            simulation.__init__()
-            simulation.step()
-        elif control.action == "set_time" and control.time_iso:
-            from datetime import datetime
-            simulation.current_time = datetime.fromisoformat(control.time_iso)
-            simulation.step() # force one step to update the rooms state at the new time
+        elif control.action == "set_time":
+            if control.hour is not None:
+                simulation.current_time = simulation.current_time.replace(hour=control.hour, minute=0, second=0)
+                simulation.step()
+            elif control.time_iso:
+                from datetime import datetime
+                simulation.current_time = datetime.fromisoformat(control.time_iso)
+                simulation.step()
         if control.speed:
             simulation.speed = control.speed
     else:
