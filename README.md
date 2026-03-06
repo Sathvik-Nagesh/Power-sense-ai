@@ -41,27 +41,72 @@
 
 ---
 
-## 🛠️ Installation & Setup
+## 🛠️ Installation & Setup (For Teammates & Developers)
 
-### 1. Backend Setup
+Since data files and trained models are `.gitignore`d to keep the repository lightweight, you will need to generate the local database and train the AI model on your machine after cloning.
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/your-username/powersense-ai.git
+cd powersense-ai
+```
+
+### 2. Dataset Setup
+1. Download the **UCI Household Power Consumption** dataset (or use the provided hackathon asset `campus_energy_data.csv`).
+2. Create a folder named `Data_set` in the root of the project.
+3. Place the dataset inside it and ensure it is named `Electricity_consumption.txt` (or update the path in `backend/data_processor.py`).
+
+Your folder structure should look like this:
+```text
+/powersense-ai
+  ├── Data_set/
+  │    └── Electricity_consumption.txt
+  ├── backend/
+  └── frontend/
+```
+
+### 3. Backend & AI Setup
+Open a terminal and navigate to the `backend` folder:
+
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate   # On Windows
-pip install -r requirements.txt
 
-# Run the backend API & AI Simulation Engine
+# On Windows:
+venv\Scripts\activate
+# On Mac/Linux:
+source venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+**Generate the Database:**
+Run the data processor to parse the raw dataset and synthetically generate the classroom environments into a local SQLite database (`powersense.db`):
+```bash
+python data_processor.py
+```
+
+**Train the AI Model:**
+Run the model script to train the RandomForest classifier and save it as `occupancy_model.joblib`:
+```bash
+python model.py
+```
+*(Note: If you skip this step, running `main.py` will automatically train the model on the first request.)*
+
+**Start the Server:**
+```bash
 python main.py
 ```
-*The backend runs on `http://localhost:8000`*
+*The FastAPI backend will now be running on `http://localhost:8000`*
 
-### 2. Frontend Setup
+### 4. Frontend Setup
+Open a **new** terminal window and navigate to the `frontend` folder:
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-*The frontend runs on `http://localhost:5173`*
+*The Holographic Dashboard will be available at `http://localhost:5173`*
 
 ---
 
