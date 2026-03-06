@@ -1,296 +1,205 @@
-import { useMemo } from 'react'
+const TIMETABLES = {
+    A101: [[8, 10], [11, 13], [14, 16]],
+    A202: [[9, 11], [13, 15]],
+    B101: [[8, 10], [10, 12], [14, 17]],
+    B203: [[10, 12], [15, 17]],
+    C101: [[9, 12], [14, 16]],
+    C202: [[8, 10], [13, 16]],
+    D101: [[9, 11], [11, 13], [15, 17]],
+    D302: [[10, 12], [14, 16]],
+}
 
-/**
- * SVG Campus Map with animated power grid wires.
- * Each building block color-codes by occupancy status.
- * Wire pulses glow when room is active, dim when empty.
- */
-export default function CampusMap({ rooms = [], predictions = [], onRoomClick, selectedRoom }) {
-    const roomPositions = {
-        'A101': { x: 80, y: 60, w: 100, h: 70 },
-        'A202': { x: 80, y: 160, w: 100, h: 70 },
-        'B101': { x: 240, y: 60, w: 100, h: 70 },
-        'B203': { x: 240, y: 160, w: 100, h: 70 },
-        'C101': { x: 400, y: 60, w: 100, h: 70 },
-        'C202': { x: 400, y: 160, w: 100, h: 70 },
-        'D101': { x: 560, y: 60, w: 100, h: 70 },
-        'D302': { x: 560, y: 160, w: 100, h: 70 },
-    }
+// Positions in the SVG viewport (740 × 420)
+const ROOMS_CFG = [
+    { id: 'A101', label: 'A101', x: 55, y: 55, w: 95, h: 65, building: 'Block A', floor: 1 },
+    { id: 'A202', label: 'A202', x: 55, y: 145, w: 95, h: 65, building: 'Block A', floor: 2 },
+    { id: 'B101', label: 'B101', x: 210, y: 55, w: 95, h: 65, building: 'Block B', floor: 1 },
+    { id: 'B203', label: 'B203', x: 210, y: 145, w: 95, h: 65, building: 'Block B', floor: 2 },
+    { id: 'C101', label: 'C101', x: 365, y: 55, w: 95, h: 65, building: 'Block C', floor: 1 },
+    { id: 'C202', label: 'C202', x: 365, y: 145, w: 95, h: 65, building: 'Block C', floor: 2 },
+    { id: 'D101', label: 'D101', x: 520, y: 55, w: 95, h: 65, building: 'Block D', floor: 1 },
+    { id: 'D302', label: 'D302', x: 520, y: 145, w: 95, h: 65, building: 'Block D', floor: 3 },
+]
 
-    const powerStation = { x: 340, y: 330 }
+const HUB = { x: 295, y: 340 }
 
-    const getStatusColor = (room) => {
-        if (!room) return '#64748b'
-        switch (room.status) {
-            case 'occupied': return '#10b981'
-            case 'empty': return '#ef4444'
-            case 'predicted_empty_soon': return '#f59e0b'
-            default: return '#64748b'
-        }
-    }
+function statusColor(status) {
+    if (status === 'occupied') return '#00d68f'
+    if (status === 'predicted_empty_soon') return '#ffb300'
+    return '#ff4757'
+}
 
-    const getGlowFilter = (status) => {
-        switch (status) {
-            case 'occupied': return 'url(#glow-green)'
-            case 'empty': return 'none'
-            case 'predicted_empty_soon': return 'url(#glow-yellow)'
-            default: return 'none'
-        }
-    }
-
-    const roomMap = useMemo(() => {
-        const map = {}
-        rooms.forEach(r => { map[r.id] = r })
-        return map
-    }, [rooms])
+export default function CampusMap({ rooms, preds, simHour }) {
+    const roomMap = Object.fromEntries(rooms.map(r => [r.id, r]))
+    const predMap = Object.fromEntries(preds.map(p => [p.room, p]))
 
     return (
-        <svg viewBox="0 0 720 400" className="campus-svg" style={{ width: '100%', height: '100%' }}>
+        <svg viewBox="0 0 740 420" className="campus-svg">
             <defs>
                 {/* Glow filters */}
-                <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
-                    <feFlood floodColor="#10b981" floodOpacity="0.6" result="color" />
-                    <feComposite in="color" in2="blur" operator="in" result="glow" />
-                    <feMerge>
-                        <feMergeNode in="glow" />
-                        <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                </filter>
-                <filter id="glow-yellow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
-                    <feFlood floodColor="#f59e0b" floodOpacity="0.6" result="color" />
-                    <feComposite in="color" in2="blur" operator="in" result="glow" />
-                    <feMerge>
-                        <feMergeNode in="glow" />
-                        <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                </filter>
-                <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="6" result="blur" />
-                    <feFlood floodColor="#00f7ff" floodOpacity="0.7" result="color" />
-                    <feComposite in="color" in2="blur" operator="in" result="glow" />
-                    <feMerge>
-                        <feMergeNode in="glow" />
-                        <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                </filter>
-                <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
-                    <feFlood floodColor="#ef4444" floodOpacity="0.4" result="color" />
-                    <feComposite in="color" in2="blur" operator="in" result="glow" />
-                    <feMerge>
-                        <feMergeNode in="glow" />
-                        <feMergeNode in="SourceGraphic" />
-                    </feMerge>
-                </filter>
+                {[
+                    ['fg', '#00d68f'], ['fy', '#ffb300'], ['fr', '#ff4757'], ['fc', '#00e5ff'],
+                ].map(([id, col]) => (
+                    <filter key={id} id={id} x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="4" result="b" />
+                        <feFlood floodColor={col} floodOpacity=".6" result="c" />
+                        <feComposite in="c" in2="b" operator="in" result="g" />
+                        <feMerge><feMergeNode in="g" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                ))}
 
-                {/* Wire gradient */}
-                <linearGradient id="wire-gradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#00f7ff" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.6" />
-                </linearGradient>
-
-                {/* Building pattern */}
-                <pattern id="grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
-                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
+                {/* Subtle grid pattern */}
+                <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+                    <path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(255,255,255,.025)" strokeWidth=".5" />
                 </pattern>
             </defs>
 
-            {/* Background grid */}
-            <rect width="720" height="400" fill="url(#grid-pattern)" />
+            {/* Background */}
+            <rect width="740" height="420" fill="url(#grid)" rx="16" />
 
-            {/* Building labels */}
-            <text x="130" y="42" fill="#94a3b8" fontSize="11" textAnchor="middle" fontWeight="600" fontFamily="Inter">BLOCK A</text>
-            <text x="290" y="42" fill="#94a3b8" fontSize="11" textAnchor="middle" fontWeight="600" fontFamily="Inter">BLOCK B</text>
-            <text x="450" y="42" fill="#94a3b8" fontSize="11" textAnchor="middle" fontWeight="600" fontFamily="Inter">BLOCK C</text>
-            <text x="610" y="42" fill="#94a3b8" fontSize="11" textAnchor="middle" fontWeight="600" fontFamily="Inter">BLOCK D</text>
+            {/* Building group labels */}
+            {['Block A', 'Block B', 'Block C', 'Block D'].map((b, i) => (
+                <text key={b} x={102 + i * 155} y={35}
+                    fill="#4a5578" fontSize="10" textAnchor="middle"
+                    fontWeight="700" fontFamily="Inter" letterSpacing="2">
+                    {b.toUpperCase()}
+                </text>
+            ))}
 
-            {/* Power wires from station to each room */}
-            {Object.entries(roomPositions).map(([roomId, pos]) => {
-                const room = roomMap[roomId]
-                const isActive = room?.status === 'occupied' || room?.status === 'predicted_empty_soon'
-                const midX = pos.x + pos.w / 2
-                const midY = pos.y + pos.h
+            {/* Power wires hub → each room */}
+            {ROOMS_CFG.map(cfg => {
+                const room = roomMap[cfg.id]
+                const status = room?.status || 'empty'
+                const isOcc = status === 'occupied'
+                const isWarn = status === 'predicted_empty_soon'
+                const mx = cfg.x + cfg.w / 2
+                const my = cfg.y + cfg.h
+
+                const wireClass = isOcc ? 'wire-active' : isWarn ? 'wire-warn' : 'wire-dead'
 
                 return (
-                    <path
-                        key={`wire-${roomId}`}
-                        d={`M ${powerStation.x} ${powerStation.y} C ${powerStation.x} ${midY + 40} ${midX} ${midY + 40} ${midX} ${midY}`}
-                        className={`wire-path ${isActive ? 'active' : 'inactive'}`}
-                        style={isActive ? {
-                            stroke: '#00f7ff',
-                            filter: 'drop-shadow(0 0 6px #00f7ff)',
-                            strokeDasharray: '8 4',
-                            animation: `wire-flow ${1 / (room?.status === 'predicted_empty_soon' ? 0.5 : 1)}s linear infinite`,
-                        } : {
-                            stroke: '#64748b',
-                            opacity: 0.15,
-                            strokeDasharray: '4 4',
-                        }}
+                    <path key={`w-${cfg.id}`}
+                        className={wireClass}
+                        d={`M ${HUB.x} ${HUB.y}
+                C ${HUB.x} ${my + 30} ${mx} ${my + 30} ${mx} ${my}`}
                     />
                 )
             })}
 
-            {/* Building blocks */}
-            {Object.entries(roomPositions).map(([roomId, pos]) => {
-                const room = roomMap[roomId]
-                const color = getStatusColor(room)
-                const isSelected = selectedRoom === roomId
-                const prediction = predictions.find(p => p.room === roomId)
+            {/* Room blocks */}
+            {ROOMS_CFG.map(cfg => {
+                const room = roomMap[cfg.id]
+                const pred = predMap[cfg.id]
+                const status = room?.status || 'empty'
+                const col = statusColor(status)
+                const isOcc = status === 'occupied'
+                const isWarn = status === 'predicted_empty_soon'
+
+                const filterMap = { occupied: 'fg', predicted_empty_soon: 'fy', empty: 'fr' }
+                const f = filterMap[status]
+
+                // Timetable: is a class scheduled now?
+                const tt = TIMETABLES[cfg.id] || []
+                const classNow = tt.some(([s, e]) => simHour >= s && simHour < e)
+
+                // Student icons count
+                const cap = room?.capacity || 30
+                const count = isOcc ? Math.max(1, Math.round((room.student_count / cap) * 4)) : 0
+                const icons = ['👤', '👤', '👤', '👤']
+
+                // WiFi pct
+                const wifiPct = pred ? pred.wifi_devices / cap : 0
 
                 return (
-                    <g
-                        key={roomId}
-                        className="building-block"
-                        onClick={() => onRoomClick?.(roomId)}
-                        style={{ cursor: 'pointer' }}
-                    >
-                        {/* Building shadow */}
-                        <rect
-                            x={pos.x + 3}
-                            y={pos.y + 3}
-                            width={pos.w}
-                            height={pos.h}
-                            rx={6}
-                            fill="rgba(0,0,0,0.3)"
+                    <g key={cfg.id} style={{ cursor: 'pointer' }}>
+                        {/* Shadow */}
+                        <rect x={cfg.x + 3} y={cfg.y + 3} width={cfg.w} height={cfg.h} rx={8}
+                            fill="rgba(0,0,0,.4)" />
+
+                        {/* Building body */}
+                        <rect x={cfg.x} y={cfg.y} width={cfg.w} height={cfg.h} rx={8}
+                            fill={`${col}12`} stroke={col} strokeWidth={isOcc || isWarn ? 1.8 : 1}
+                            filter={`url(#${f})`}
+                            style={{ transition: 'all .6s ease', opacity: isOcc ? 1 : isWarn ? .85 : .55 }}
                         />
 
-                        {/* Building block */}
-                        <rect
-                            x={pos.x}
-                            y={pos.y}
-                            width={pos.w}
-                            height={pos.h}
-                            rx={6}
-                            fill={`${color}15`}
-                            stroke={color}
-                            strokeWidth={isSelected ? 2.5 : 1.5}
-                            filter={getGlowFilter(room?.status)}
-                            style={{
-                                transition: 'all 0.5s ease',
-                                opacity: room?.status === 'empty' ? 0.6 : 1,
-                            }}
-                        />
-
-                        {/* Room light glow effect */}
-                        {room?.status !== 'empty' && (
-                            <rect
-                                x={pos.x + 8}
-                                y={pos.y + 8}
-                                width={pos.w - 16}
-                                height={pos.h - 16}
-                                rx={3}
-                                fill={color}
-                                opacity={0.08}
-                            >
-                                <animate
-                                    attributeName="opacity"
-                                    values="0.05;0.12;0.05"
-                                    dur="3s"
-                                    repeatCount="indefinite"
-                                />
+                        {/* Inner glow when occupied */}
+                        {isOcc && (
+                            <rect x={cfg.x + 6} y={cfg.y + 6} width={cfg.w - 12} height={cfg.h - 12} rx={5}
+                                fill={col} opacity=".07">
+                                <animate attributeName="opacity" values=".04;.1;.04" dur="3s" repeatCount="indefinite" />
                             </rect>
                         )}
 
                         {/* Room ID */}
-                        <text
-                            x={pos.x + pos.w / 2}
-                            y={pos.y + 25}
-                            fill={color}
-                            fontSize="13"
-                            textAnchor="middle"
-                            fontWeight="700"
-                            fontFamily="JetBrains Mono, monospace"
-                        >
-                            {roomId}
+                        <text x={cfg.x + cfg.w / 2} y={cfg.y + 22}
+                            fill={col} fontSize="12" textAnchor="middle"
+                            fontWeight="700" fontFamily="JetBrains Mono, monospace">
+                            {cfg.id}
                         </text>
 
-                        {/* Status indicator */}
-                        <circle
-                            cx={pos.x + pos.w - 12}
-                            cy={pos.y + 14}
-                            r={4}
-                            fill={color}
-                        >
-                            {room?.status !== 'empty' && (
-                                <animate
-                                    attributeName="opacity"
-                                    values="1;0.4;1"
-                                    dur="2s"
-                                    repeatCount="indefinite"
-                                />
+                        {/* Schedule icon */}
+                        {classNow && (
+                            <text x={cfg.x + cfg.w - 10} y={cfg.y + 14}
+                                fontSize="9" textAnchor="middle">📅</text>
+                        )}
+
+                        {/* Status dot (top-right) */}
+                        <circle cx={cfg.x + cfg.w - 10} cy={cfg.y + 10} r={4} fill={col}>
+                            {isOcc && (
+                                <animate attributeName="opacity" values="1;.3;1" dur="2s" repeatCount="indefinite" />
                             )}
                         </circle>
 
                         {/* Student icons */}
-                        <text
-                            x={pos.x + pos.w / 2}
-                            y={pos.y + 44}
-                            fill="#f1f5f9"
-                            fontSize="10"
-                            textAnchor="middle"
-                            opacity={room?.is_occupied ? 1 : 0.2}
-                            style={{ transition: 'opacity 0.8s ease' }}
-                        >
-                            {room?.is_occupied
-                                ? '👤'.repeat(Math.min(5, Math.ceil((room?.student_count || 0) / (room?.capacity || 1) * 5)))
-                                : '👤👤👤👤👤'}
+                        <text x={cfg.x + cfg.w / 2} y={cfg.y + 40}
+                            fontSize="9" textAnchor="middle"
+                            opacity={isOcc ? 1 : .15}
+                            style={{ transition: 'opacity .7s ease' }}>
+                            {icons.slice(0, count).join('')}{icons.slice(count).map(() => '').join('')}
                         </text>
 
-                        {/* Power indicator */}
-                        <text
-                            x={pos.x + pos.w / 2}
-                            y={pos.y + pos.h - 10}
-                            fill={room?.status === 'empty' ? '#64748b' : '#00f7ff'}
-                            fontSize="8"
-                            textAnchor="middle"
-                            fontFamily="JetBrains Mono, monospace"
-                        >
-                            ⚡ {room?.current_power_kw?.toFixed(1) || '0.0'} kW
+                        {/* WiFi bars (tiny) */}
+                        {[0, .3, .6, .9].map((t, i) => (
+                            <rect key={i}
+                                x={cfg.x + 8 + i * 5} y={cfg.y + cfg.h - 8 - (i + 1) * 3}
+                                width={4} height={(i + 1) * 3}
+                                rx={1}
+                                fill={wifiPct >= t ? col : '#2a3055'}
+                                opacity={wifiPct >= t ? .9 : .3}
+                                style={{ transition: 'fill .5s,opacity .5s' }}
+                            />
+                        ))}
+
+                        {/* Power label */}
+                        <text x={cfg.x + cfg.w / 2} y={cfg.y + cfg.h - 4}
+                            fill={isOcc ? '#00e5ff' : '#4a5578'} fontSize="8"
+                            textAnchor="middle" fontFamily="JetBrains Mono, monospace">
+                            ⚡{room?.current_power_kw?.toFixed(1) || '0.0'}
                         </text>
                     </g>
                 )
             })}
 
-            {/* Central Power Station */}
-            <g className="power-station">
-                <rect
-                    x={powerStation.x - 40}
-                    y={powerStation.y - 20}
-                    width={80}
-                    height={40}
-                    rx={8}
-                    fill="rgba(0, 247, 255, 0.08)"
-                    stroke="#00f7ff"
-                    strokeWidth={2}
-                    filter="url(#glow-cyan)"
-                />
-                <text
-                    x={powerStation.x}
-                    y={powerStation.y - 2}
-                    fill="#00f7ff"
-                    fontSize="10"
-                    textAnchor="middle"
-                    fontWeight="700"
-                    fontFamily="JetBrains Mono, monospace"
-                >
+            {/* Central power hub */}
+            <g>
+                <rect x={HUB.x - 52} y={HUB.y - 22} width={104} height={44} rx={10}
+                    fill="rgba(0,229,255,.07)" stroke="#00e5ff" strokeWidth="1.5"
+                    filter="url(#fc)" />
+                <text x={HUB.x} y={HUB.y - 4}
+                    fill="#00e5ff" fontSize="10" textAnchor="middle"
+                    fontWeight="700" fontFamily="JetBrains Mono, monospace">
                     ⚡ MAIN GRID
                 </text>
-                <text
-                    x={powerStation.x}
-                    y={powerStation.y + 12}
-                    fill="#94a3b8"
-                    fontSize="8"
-                    textAnchor="middle"
-                    fontFamily="JetBrains Mono, monospace"
-                >
-                    Power Substation
-                </text>
+                <text x={HUB.x} y={HUB.y + 12}
+                    fill="#4a5578" fontSize="8" textAnchor="middle"
+                    fontFamily="Inter">Power Substation</text>
             </g>
 
-            {/* Campus label */}
-            <text x="360" y="390" fill="#64748b" fontSize="9" textAnchor="middle" fontFamily="Inter" letterSpacing="3">
+            {/* Legend footer */}
+            <text x={370} y={412}
+                fill="#2a3055" fontSize="9" textAnchor="middle"
+                fontFamily="Inter" letterSpacing="3" fontWeight="600">
                 POWERSENSE AI — CAMPUS ENERGY GRID
             </text>
         </svg>

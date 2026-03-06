@@ -1,135 +1,209 @@
 import { useMemo } from 'react'
 
-/**
- * Classroom detail card with student icon animations,
- * device toggle indicators, and manual override button.
- */
-export default function ClassroomCard({ room, prediction, energy, isSelected, onSelect, onOverride }) {
+// Maps room id to class slot labels
+const SLOT_LABELS = {
+    A101: ['08-10', '11-13', '14-16'],
+    A202: ['09-11', '13-15'],
+    B101: ['08-10', '10-12', '14-17'],
+    B203: ['10-12', '15-17'],
+    C101: ['09-12', '14-16'],
+    C202: ['08-10', '13-16'],
+    D101: ['09-11', '11-13', '15-17'],
+    D302: ['10-12', '14-16'],
+}
+
+// Which slots are active at simHour
+function activeSlots(roomId, simHour, timetable) {
+    return (SLOT_LABELS[roomId] || []).map((label, i) => {
+        const range = timetable[i]
+        if (!range) return { label, on: false }
+        const [s, e] = range
+        return { label, on: simHour >= s && simHour < e }
+    })
+}
+
+// WiFi bar component
+function WifiSignal({ devices, capacity }) {
+    const pct = capacity > 0 ? devices / capacity : 0
+    const levels = [.15, .35, .6, .85]
+    return (
+        <div className="wifi-bars" title={`${devices} devices`}>
+            {levels.map((threshold, i) => (
+                <div
+                    key={i}
+                    className={`wifi-bar ${pct >= threshold ? 'lit' : ''}`}
+                    style={{ height: `${(i + 1) * 3 + 3}px` }}
+                />
+            ))}
+        </div>
+    )
+}
+
+function recClass(rec) {
+    if (rec === 'turn_off_all') return 'off-all'
+    if (rec === 'reduce_power') return 'reduce'
+    if (rec === 'manual_override') return 'override'
+    return 'keep'
+}
+
+function recLabel(rec) {
+    if (rec === 'turn_off_all') return '🔴 Turn Off All'
+    if (rec === 'reduce_power') return '🟡 Reduce Power'
+    if (rec === 'manual_override') return '🟠 Manual Override'
+    return '🟢 Keep Power On'
+}
+
+export default function ClassroomCard({
+    room, pred, energy, timetable, simHour,
+    expanded, onToggle, onOverride
+}) {
     if (!room) return null
 
     const status = room.status || 'empty'
-    const studentIcons = useMemo(() => {
-        const maxIcons = 6
-        const count = room.is_occupied
-            ? Math.max(1, Math.ceil((room.student_count / room.capacity) * maxIcons))
-            : 0
-        return Array.from({ length: maxIcons }, (_, i) => ({
-            visible: i < count,
-            key: i,
-        }))
-    }, [room.is_occupied, room.student_count, room.capacity])
+    const cls = status === 'occupied' ? 'occ' : status === 'predicted_empty_soon' ? 'warn' : 'emp'
 
-    const predText = prediction
-        ? `${(prediction.predicted_occupancy * 100).toFixed(0)}%`
-        : '--'
+    const slots = useMemo(() => activeSlots(room.id, simHour, timetable), [room.id, simHour, timetable])
+    const hasActiveSlot = slots.some(s => s.on)
 
-    const pred30Text = prediction
-        ? `${(prediction.predicted_occupancy_30min * 100).toFixed(0)}%`
-        : '--'
+    const maxStudents = 6
+    const visibleCount = room.is_occupied
+        ? Math.max(1, Math.round((room.student_count / room.capacity) * maxStudents))
+        : 0
+
+    const wifiDevices = pred?.wifi_devices ?? 0
+    const predNow = pred ? Math.round(pred.predicted_occupancy * 100) : 0
+    const pred30 = pred ? Math.round(pred.predicted_occupancy_30min * 100) : 0
+    const rec = pred?.recommendation || 'keep_power_on'
+
+    const powerPct = energy
+        ? Math.round((energy.current_power_kw / energy.max_power_kw) * 100)
+        : 0
 
     return (
-        <div
-            className={`room-card ${status} ${isSelected ? 'selected' : ''}`}
-            onClick={onSelect}
-            style={isSelected ? {
-                boxShadow: `0 0 20px ${status === 'occupied' ? 'rgba(16,185,129,0.15)' :
-                    status === 'predicted_empty_soon' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`,
-                borderColor: status === 'occupied' ? '#10b981' : status === 'predicted_empty_soon' ? '#f59e0b' : '#ef4444',
-            } : {}}
-        >
-            <div className="room-card-header">
-                <span className="room-id">{room.id}</span>
-                <span className={`room-status-badge ${status}`}>
-                    {status === 'predicted_empty_soon' ? '⚠ EMPTYING' :
-                        status === 'occupied' ? '● ACTIVE' : '○ EMPTY'}
+        <div className={`rc ${cls} ${expanded ? 'expanded' : ''}`}>
+
+            {/* SUMMARY ROW — always visible */}
+            <div className="rc__summary" onClick={onToggle}>
+                <span className="rc__led" />
+                <span className="rc__id">{room.id}</span>
+                <span className="rc__name">{room.name}</span>
+
+                {/* WiFi bars */}
+                <WifiSignal devices={wifiDevices} capacity={room.capacity} />
+
+                {/* Schedule dot */}
+                {hasActiveSlot && (
+                    <span style={{ fontSize: '.62rem', color: 'var(--c-cyan)', fontWeight: 700, marginLeft: 2 }}
+                        title="Class in session">📅</span>
+                )}
+
+                <span className="rc__badge">
+                    {cls === 'occ' ? '● Active' : cls === 'warn' ? '⚠ Emptying' : '○ Empty'}
                 </span>
             </div>
 
-            <div className="room-name">
-                {room.name} · {room.building} · Floor {room.floor}
-            </div>
-
-            {/* Student icons with fade animation */}
-            <div className="room-students">
-                {studentIcons.map(({ visible, key }) => (
-                    <span
-                        key={key}
-                        className={`student-icon ${visible ? 'visible' : 'hidden'}`}
-                        style={{
-                            transitionDelay: `${key * 0.08}s`,
-                        }}
-                    >
-                        👤
-                    </span>
-                ))}
-                <span style={{
-                    fontSize: '0.65rem',
-                    color: 'var(--text-muted)',
-                    marginLeft: '4px',
-                    alignSelf: 'center',
-                }}>
-                    {room.student_count}/{room.capacity}
-                </span>
-            </div>
-
-            {/* Device indicators */}
-            <div className="room-devices">
-                <span className={`device-indicator ${room.lights_on ? 'on' : 'off'}`}>
-                    💡 {room.lights_on ? 'ON' : 'OFF'}
-                </span>
-                <span className={`device-indicator ${room.ac_on ? 'on' : 'off'}`}>
-                    ❄️ {room.ac_on ? 'ON' : 'OFF'}
-                </span>
-                <span className={`device-indicator ${room.fans_on ? 'on' : 'off'}`}>
-                    🌀 {room.fans_on ? 'ON' : 'OFF'}
-                </span>
-            </div>
-
-            {/* Metrics */}
-            <div className="room-meta">
-                <span className="room-power">⚡ {room.current_power_kw?.toFixed(2)} kW</span>
-                <span className="room-prediction">
-                    Now: {predText} · 30min: {pred30Text}
-                </span>
-            </div>
-
-            {/* Recommendation */}
-            {prediction?.recommendation && prediction.recommendation !== 'keep_power_on' && (
-                <div style={{
-                    marginTop: '8px',
-                    padding: '4px 8px',
-                    background: prediction.recommendation === 'turn_off_all'
-                        ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                    borderRadius: '4px',
-                    fontSize: '0.65rem',
-                    color: prediction.recommendation === 'turn_off_all' ? '#ef4444' : '#f59e0b',
-                    fontWeight: '600',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                }}>
-                    🤖 AI: {prediction.recommendation.replace(/_/g, ' ')}
+            {/* MINI STATS — always visible */}
+            <div className="rc__mini">
+                <div className="rc__mini-item">
+                    👤 <span>{room.student_count}</span>/{room.capacity}
                 </div>
-            )}
+                <div className="rc__mini-item">
+                    ⚡ <span>{room.current_power_kw?.toFixed(1)} kW</span>
+                </div>
+                <div className="rc__mini-item">
+                    📶 <span>{wifiDevices}</span> devices
+                </div>
+                <div className="rc__mini-item" style={{ marginLeft: 'auto' }}>
+                    <span style={{ color: predNow > 60 ? 'var(--c-green)' : predNow > 30 ? 'var(--c-yellow)' : 'var(--c-red)' }}>
+                        {predNow}%
+                    </span>
+                    &nbsp;→ {pred30}%
+                </div>
+            </div>
 
-            {/* Override button */}
-            <button
-                className={`override-btn ${room.override_active ? 'active' : ''}`}
-                onClick={(e) => {
-                    e.stopPropagation()
-                    onOverride(room.id, !room.override_active)
-                }}
-            >
-                {room.override_active ? '🔓 Remove Override' : '🔒 Faculty Override'}
-            </button>
+            {/* EXPANDED DETAIL */}
+            {expanded && (
+                <div className="rc__detail">
 
-            {room.override_active && (
-                <div style={{
-                    marginTop: '4px',
-                    fontSize: '0.6rem',
-                    color: 'var(--accent-orange)',
-                    textAlign: 'center',
-                }}>
-                    Manual override active — {room.override_by || 'Faculty'}
+                    {/* Room info */}
+                    <div style={{ fontSize: '.7rem', color: 'var(--t3)' }}>
+                        🏢 {room.building} · Floor {room.floor} · Capacity {room.capacity}
+                    </div>
+
+                    {/* Timetable */}
+                    <div className="timetable-row">
+                        <span className="tt-label">📅 Schedule</span>
+                        {slots.length > 0 ? slots.map(({ label, on }) => (
+                            <span key={label} className={`tt-slot ${on ? 'active' : ''}`}>
+                                {label}
+                            </span>
+                        )) : <span style={{ fontSize: '.65rem', color: 'var(--t3)' }}>No classes</span>}
+                    </div>
+
+                    {/* Student icons */}
+                    <div className="students-row">
+                        {Array.from({ length: maxStudents }, (_, i) => (
+                            <span key={i} className={`s-icon ${i < visibleCount ? 'on' : 'off'}`}
+                                style={{ transitionDelay: `${i * 80}ms` }}>
+                                👤
+                            </span>
+                        ))}
+                        <span className="s-count">{room.student_count}/{room.capacity} students</span>
+                    </div>
+
+                    {/* WiFi detail */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <WifiSignal devices={wifiDevices} capacity={room.capacity} />
+                        <span style={{ fontSize: '.72rem', color: 'var(--t2)' }}>
+                            <b style={{ color: 'var(--c-cyan)' }}>{wifiDevices}</b> devices connected
+                            &nbsp;({Math.round((wifiDevices / room.capacity) * 100)}% capacity)
+                        </span>
+                    </div>
+
+                    {/* Devices */}
+                    <div className="devices-row">
+                        <span className={`dev-tag ${room.lights_on ? 'on' : 'off'}`}>💡 Lights {room.lights_on ? 'ON' : 'OFF'}</span>
+                        <span className={`dev-tag ${room.ac_on ? 'on' : 'off'}`}>❄️ AC {room.ac_on ? 'ON' : 'OFF'}</span>
+                        <span className={`dev-tag ${room.fans_on ? 'on' : 'off'}`}>🌀 Fans {room.fans_on ? 'ON' : 'OFF'}</span>
+                    </div>
+
+                    {/* Prediction metrics */}
+                    <div className="metrics-row">
+                        <div className="metric-box">
+                            <div className="metric-box__label">Occupancy Now</div>
+                            <div className={`metric-box__val ${predNow > 60 ? 'green' : predNow > 30 ? 'yellow' : 'red'}`}>{predNow}%</div>
+                        </div>
+                        <div className="metric-box">
+                            <div className="metric-box__label">In 30 min</div>
+                            <div className={`metric-box__val ${pred30 > 60 ? 'green' : pred30 > 30 ? 'yellow' : 'red'}`}>{pred30}%</div>
+                        </div>
+                        <div className="metric-box">
+                            <div className="metric-box__label">Power Draw</div>
+                            <div className="metric-box__val cyan">{room.current_power_kw?.toFixed(2)} kW</div>
+                        </div>
+                        <div className="metric-box">
+                            <div className="metric-box__label">Saved</div>
+                            <div className="metric-box__val green">{energy?.energy_saved_kwh?.toFixed(2) ?? '0'} kWh</div>
+                        </div>
+                    </div>
+
+                    {/* AI recommendation */}
+                    <div className={`ai-rec ${recClass(rec)}`}>
+                        🤖 AI Recommendation: <b>{recLabel(rec)}</b>
+                    </div>
+
+                    {/* Override */}
+                    <button
+                        className={`override-btn ${room.override_active ? 'active' : ''}`}
+                        onClick={e => { e.stopPropagation(); onOverride(room.id, !room.override_active) }}
+                    >
+                        {room.override_active ? '🔓 Remove Faculty Override' : '🔒 Faculty Override (Force On)'}
+                    </button>
+                    {room.override_active && (
+                        <div style={{ textAlign: 'center', fontSize: '.62rem', color: 'var(--c-orange)' }}>
+                            Manual override active — all devices forced ON
+                        </div>
+                    )}
                 </div>
             )}
         </div>

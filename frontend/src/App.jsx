@@ -4,259 +4,249 @@ import CampusMap from './components/CampusMap'
 import ClassroomCard from './components/ClassroomCard'
 import EnergyDashboard from './components/EnergyDashboard'
 import EnergyHeatmap from './components/EnergyHeatmap'
-import SimulationControls from './components/SimulationControls'
 
-const API_BASE = 'http://localhost:8000/api'
+const API = 'http://localhost:8000/api'
 
-function App() {
+// Timetable per room — mirrors simulation.py schedules
+const TIMETABLES = {
+  A101: [[8, 10], [11, 13], [14, 16]],
+  A202: [[9, 11], [13, 15]],
+  B101: [[8, 10], [10, 12], [14, 17]],
+  B203: [[10, 12], [15, 17]],
+  C101: [[9, 12], [14, 16]],
+  C202: [[8, 10], [13, 16]],
+  D101: [[9, 11], [11, 13], [15, 17]],
+  D302: [[10, 12], [14, 16]],
+}
+
+function fmt(iso) {
+  if (!iso) return '--:--'
+  const d = new Date(iso)
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) +
+    '  ·  ' + d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+export default function App() {
   const [rooms, setRooms] = useState([])
-  const [predictions, setPredictions] = useState([])
-  const [energyUsage, setEnergyUsage] = useState([])
+  const [preds, setPreds] = useState([])
+  const [energy, setEnergy] = useState([])
   const [stats, setStats] = useState(null)
-  const [simState, setSimState] = useState(null)
-  const [currentTime, setCurrentTime] = useState('')
+  const [curTime, setCurTime] = useState('')
+  const [simHour, setSimHour] = useState(7)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
-  const [selectedRoom, setSelectedRoom] = useState(null)
-  const intervalRef = useRef(null)
+  const [expanded, setExpanded] = useState(null)
+  const timerRef = useRef(null)
 
   const fetchAll = useCallback(async () => {
     try {
-      const [roomsRes, predsRes, energyRes, statsRes, stateRes] = await Promise.all([
-        fetch(`${API_BASE}/rooms`),
-        fetch(`${API_BASE}/predictions`),
-        fetch(`${API_BASE}/energy-usage`),
-        fetch(`${API_BASE}/stats`),
-        fetch(`${API_BASE}/simulation-state`),
+      const [rRes, pRes, eRes, sRes] = await Promise.all([
+        fetch(`${API}/rooms`),
+        fetch(`${API}/predictions`),
+        fetch(`${API}/energy-usage`),
+        fetch(`${API}/stats`),
       ])
-
-      const roomsData = await roomsRes.json()
-      const predsData = await predsRes.json()
-      const energyData = await energyRes.json()
-      const statsData = await statsRes.json()
-      const stateData = await stateRes.json()
-
-      setRooms(roomsData.rooms || [])
-      setPredictions(predsData.predictions || [])
-      setEnergyUsage(energyData.energy_usage || [])
-      setStats(statsData.stats || null)
-      setSimState(stateData)
-      setCurrentTime(roomsData.current_time || '')
-    } catch (err) {
-      console.error('API fetch error:', err)
-    }
+      const rD = await rRes.json()
+      const pD = await pRes.json()
+      const eD = await eRes.json()
+      const sD = await sRes.json()
+      setRooms(rD.rooms || [])
+      setPreds(pD.predictions || [])
+      setEnergy(eD.energy_usage || [])
+      setStats(sD.stats || null)
+      setCurTime(rD.current_time || '')
+      if (rD.current_time) {
+        setSimHour(new Date(rD.current_time).getHours())
+      }
+    } catch (e) { /* silent */ }
   }, [])
 
-  const stepSimulation = useCallback(async () => {
+  const step = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/simulate`, {
+      await fetch(`${API}/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'step', speed }),
       })
-      await res.json()
-      await fetchAll()
-    } catch (err) {
-      console.error('Simulation step error:', err)
-    }
+      fetchAll()
+    } catch (e) { }
   }, [speed, fetchAll])
 
-  const togglePlay = useCallback(() => {
-    setIsPlaying(prev => !prev)
-  }, [])
-
-  const resetSimulation = useCallback(async () => {
+  const reset = useCallback(async () => {
     setIsPlaying(false)
     try {
-      await fetch(`${API_BASE}/simulate`, {
+      await fetch(`${API}/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reset' }),
       })
-      await fetchAll()
-    } catch (err) {
-      console.error('Reset error:', err)
-    }
+      fetchAll()
+    } catch (e) { }
   }, [fetchAll])
 
-  const handleOverride = useCallback(async (roomId, active) => {
+  const override = useCallback(async (id, active) => {
     try {
-      await fetch(`${API_BASE}/override`, {
+      await fetch(`${API}/override`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ room_id: roomId, active, override_by: 'Faculty' }),
+        body: JSON.stringify({ room_id: id, active, override_by: 'Faculty' }),
       })
-      await fetchAll()
-    } catch (err) {
-      console.error('Override error:', err)
-    }
+      fetchAll()
+    } catch (e) { }
   }, [fetchAll])
 
-  // Initial fetch
-  useEffect(() => {
-    fetchAll()
-  }, [fetchAll])
+  useEffect(() => { fetchAll() }, [fetchAll])
 
-  // Auto-play interval
   useEffect(() => {
     if (isPlaying) {
-      const interval = 3000 / speed
-      intervalRef.current = setInterval(() => {
-        stepSimulation()
-      }, interval)
+      const ms = Math.max(700, 3000 / speed)
+      timerRef.current = setInterval(step, ms)
     } else {
-      if (intervalRef.current) clearInterval(intervalRef.current)
+      clearInterval(timerRef.current)
     }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [isPlaying, speed, stepSimulation])
+    return () => clearInterval(timerRef.current)
+  }, [isPlaying, speed, step])
 
-  const formatTime = (isoStr) => {
-    if (!isoStr) return '--:--'
-    const d = new Date(isoStr)
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) +
-      ' | ' + d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-  }
+  const predMap = Object.fromEntries(preds.map(p => [p.room, p]))
+  const energyMap = Object.fromEntries(energy.map(e => [e.room, e]))
 
   return (
     <div className="app">
-      {/* Header */}
+
+      {/* HEADER */}
       <header className="header">
-        <div className="header-logo">
-          <svg viewBox="0 0 36 36" fill="none">
-            <circle cx="18" cy="18" r="16" stroke="url(#hgrad)" strokeWidth="2" />
-            <path d="M12 18L18 10L24 18L18 26Z" fill="url(#hgrad)" opacity="0.8" />
-            <path d="M18 6V30M6 18H30" stroke="url(#hgrad)" strokeWidth="1" opacity="0.3" />
-            <defs>
-              <linearGradient id="hgrad" x1="0" y1="0" x2="36" y2="36">
-                <stop stopColor="#00f7ff" />
-                <stop offset="1" stopColor="#3b82f6" />
-              </linearGradient>
-            </defs>
-          </svg>
-          <div>
+        <div className="logo-wrap">
+          <div className="logo-icon">⚡</div>
+          <div className="logo-text">
             <h1>PowerSense AI</h1>
-            <div className="subtitle">Smart Campus Energy Control</div>
+            <div className="tagline">Smart Campus Energy System</div>
           </div>
         </div>
-        <div className="header-time">
-          <div className="model-badge">
-            <span className="dot"></span>
-            AI Model Active
+        <div className="header-right">
+          <div className="ai-pill">
+            <span className="blink" />
+            AI Active · RandomForest
           </div>
-          <div className="sim-time">{formatTime(currentTime)}</div>
+          <div className="clock-pill">{fmt(curTime)}</div>
         </div>
       </header>
 
-      {/* Stats Bar */}
-      <div style={{ padding: '24px 32px 0' }}>
-        <div className="stats-bar">
-          <div className="stat-card energy">
-            <div className="stat-label">Energy Saved</div>
-            <div className="stat-value energy">{stats?.total_energy_saved_kwh?.toFixed(1) || '0.0'}</div>
-            <div className="stat-unit">kWh today</div>
-          </div>
-          <div className="stat-card cost">
-            <div className="stat-label">Cost Saved</div>
-            <div className="stat-value cost">₹{stats?.total_cost_saved?.toFixed(0) || '0'}</div>
-            <div className="stat-unit">Indian Rupees</div>
-          </div>
-          <div className="stat-card co2">
-            <div className="stat-label">CO₂ Reduced</div>
-            <div className="stat-value co2">{stats?.total_co2_reduced_kg?.toFixed(1) || '0.0'}</div>
-            <div className="stat-unit">kg CO₂</div>
-          </div>
-          <div className="stat-card rooms">
-            <div className="stat-label">Rooms Optimized</div>
-            <div className="stat-value rooms">{stats?.rooms_optimized || 0}/{stats?.total_rooms || 8}</div>
-            <div className="stat-unit">currently managed</div>
-          </div>
+      {/* STATS */}
+      <div className="stats-strip">
+        <div className="stat-tile s-energy">
+          <div className="stat-tile__icon">🔋</div>
+          <div className="stat-tile__label">Energy Saved</div>
+          <div className="stat-tile__val">{stats?.total_energy_saved_kwh?.toFixed(1) ?? '0.0'}</div>
+          <div className="stat-tile__sub">kWh today</div>
+        </div>
+        <div className="stat-tile s-cost">
+          <div className="stat-tile__icon">💰</div>
+          <div className="stat-tile__label">Cost Saved</div>
+          <div className="stat-tile__val">₹{stats?.total_cost_saved?.toFixed(0) ?? '0'}</div>
+          <div className="stat-tile__sub">Indian Rupees</div>
+        </div>
+        <div className="stat-tile s-co2">
+          <div className="stat-tile__icon">🌿</div>
+          <div className="stat-tile__label">CO₂ Reduced</div>
+          <div className="stat-tile__val">{stats?.total_co2_reduced_kg?.toFixed(1) ?? '0.0'}</div>
+          <div className="stat-tile__sub">kg CO₂ (0.82 kg/kWh)</div>
+        </div>
+        <div className="stat-tile s-rooms">
+          <div className="stat-tile__icon">🏫</div>
+          <div className="stat-tile__label">Rooms Optimized</div>
+          <div className="stat-tile__val">{stats?.rooms_optimized ?? 0}/{stats?.total_rooms ?? 8}</div>
+          <div className="stat-tile__sub">auto-managed</div>
         </div>
       </div>
 
-      {/* Simulation Controls */}
-      <div style={{ padding: '16px 32px 0' }}>
-        <SimulationControls
-          isPlaying={isPlaying}
-          speed={speed}
-          onTogglePlay={togglePlay}
-          onStep={stepSimulation}
-          onReset={resetSimulation}
-          onSpeedChange={setSpeed}
-        />
+      {/* SIM CONTROLS */}
+      <div className="sim-bar">
+        <button className={`sim-bar__btn play ${isPlaying ? 'active' : ''}`}
+          onClick={() => setIsPlaying(p => !p)}>
+          {isPlaying ? '⏸ Pause' : '▶ Play'}
+        </button>
+        <button className="sim-bar__btn" onClick={step} disabled={isPlaying}>⏭ Step</button>
+        <button className="sim-bar__btn" onClick={reset}>↺ Reset</button>
+
+        <div className="sim-bar__divider" />
+        <span className="sim-bar__label">Speed</span>
+        <div className="speed-group">
+          {[1, 2, 4].map(s => (
+            <button key={s} className={`speed-btn ${speed === s ? 'active' : ''}`}
+              onClick={() => setSpeed(s)}>{s}×</button>
+          ))}
+        </div>
+
+        <div className={`sim-bar__status ${isPlaying ? 'running' : ''}`}>
+          <span className="dot" />
+          {isPlaying ? 'Simulating…' : 'Paused'}
+        </div>
       </div>
 
-      {/* Main Layout */}
-      <div className="main-layout">
-        <div className="left-panel">
+      {/* BODY */}
+      <div className="body-grid">
+
+        {/* LEFT */}
+        <div className="left-col">
+
           {/* Campus Map */}
-          <div className="section campus-map-container">
-            <div className="section-header">
-              <div className="section-title">
-                <span className="icon">🗺️</span> Campus Power Grid
-              </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                🟢 Occupied · 🔴 Empty · 🟡 Empty Soon
+          <div className="panel">
+            <div className="panel__head">
+              <div className="panel__title"><span className="ico">🗺️</span>Campus Power Grid</div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '.7rem', color: 'var(--t3)' }}>
+                <span style={{ color: 'var(--c-green)' }}>● Occupied</span>
+                <span style={{ color: 'var(--c-red)' }}>● Empty</span>
+                <span style={{ color: 'var(--c-yellow)' }}>● Emptying</span>
               </div>
             </div>
-            <div className="section-body">
-              <CampusMap
-                rooms={rooms}
-                predictions={predictions}
-                onRoomClick={setSelectedRoom}
-                selectedRoom={selectedRoom}
-              />
+            <div className="campus-wrap">
+              <CampusMap rooms={rooms} preds={preds} simHour={simHour} />
             </div>
           </div>
 
-          {/* Energy Charts + Heatmap */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-            <div className="section">
-              <div className="section-header">
-                <div className="section-title">
-                  <span className="icon">📊</span> Energy Consumption
-                </div>
+          {/* Charts */}
+          <div className="bottom-row">
+            <div className="panel">
+              <div className="panel__head">
+                <div className="panel__title"><span className="ico">📊</span>Energy Consumption</div>
               </div>
-              <div className="section-body">
-                <EnergyDashboard energyUsage={energyUsage} />
+              <div className="panel__body">
+                <EnergyDashboard energyUsage={energy} />
               </div>
             </div>
-            <div className="section">
-              <div className="section-header">
-                <div className="section-title">
-                  <span className="icon">🔥</span> Campus Heatmap
-                </div>
+            <div className="panel">
+              <div className="panel__head">
+                <div className="panel__title"><span className="ico">🌡️</span>Efficiency Heatmap</div>
               </div>
-              <div className="section-body">
-                <EnergyHeatmap energyUsage={energyUsage} />
+              <div className="panel__body">
+                <EnergyHeatmap energyUsage={energy} />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Panel — Room Cards */}
-        <div className="right-panel">
-          <div className="section" style={{ flex: 1 }}>
-            <div className="section-header">
-              <div className="section-title">
-                <span className="icon">🏫</span> Classrooms
-              </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+        {/* RIGHT — Room Cards */}
+        <div className="right-col">
+          <div className="panel" style={{ flex: 1 }}>
+            <div className="panel__head">
+              <div className="panel__title"><span className="ico">🏫</span>Classrooms</div>
+              <div className="panel__badge green">
                 {rooms.filter(r => r.is_occupied).length} active
               </div>
             </div>
-            <div className="section-body">
-              <div className="room-grid">
+            <div className="panel__body" style={{ paddingTop: 12 }}>
+              <div className="room-list">
                 {rooms.map(room => (
                   <ClassroomCard
                     key={room.id}
                     room={room}
-                    prediction={predictions.find(p => p.room === room.id)}
-                    energy={energyUsage.find(e => e.room === room.id)}
-                    isSelected={selectedRoom === room.id}
-                    onSelect={() => setSelectedRoom(room.id === selectedRoom ? null : room.id)}
-                    onOverride={handleOverride}
+                    pred={predMap[room.id]}
+                    energy={energyMap[room.id]}
+                    timetable={TIMETABLES[room.id] || []}
+                    simHour={simHour}
+                    expanded={expanded === room.id}
+                    onToggle={() => setExpanded(expanded === room.id ? null : room.id)}
+                    onOverride={override}
                   />
                 ))}
               </div>
@@ -267,5 +257,3 @@ function App() {
     </div>
   )
 }
-
-export default App
