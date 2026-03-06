@@ -192,8 +192,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* TOP RIGHT - Stats Strip (Vertical or Grid) */}
-          <div className="ui-stats">
+          {/* Stats 2×2 Grid */}
+          <div className="ui-stats-grid">
             <div className="stat-tile glass-panel s-energy">
               <div className="stat-tile__icon">🔋</div>
               <div className="stat-tile__label">Energy Saved</div>
@@ -223,16 +223,16 @@ export default function App() {
               <div className="panel__head">
                 <div className="panel__title"><span className="ico">📊</span>Live Consumption</div>
               </div>
-              <div className="panel__body" style={{ width: 400 }}>
+              <div className="panel__body">
                 <EnergyDashboard energyUsage={energy} />
               </div>
             </div>
 
-            <div className="panel glass-panel" style={{ marginTop: 16 }}>
+            <div className="panel glass-panel" style={{ marginTop: 8 }}>
               <div className="panel__head">
                 <div className="panel__title"><span className="ico">🌡️</span>Efficiency Heatmap</div>
               </div>
-              <div className="panel__body" style={{ width: 400 }}>
+              <div className="panel__body">
                 <EnergyHeatmap energyUsage={energy} />
               </div>
             </div>
