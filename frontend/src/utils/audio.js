@@ -15,8 +15,19 @@ function getCtx() {
     return ctx
 }
 
+let isMuted = false
+
+export function setMuteState(muted) {
+    isMuted = muted
+    if (ambientNode) {
+        const c = getCtx()
+        ambientNode.gain.gain.linearRampToValueAtTime(muted ? 0 : 0.015, c.currentTime + 0.5)
+    }
+}
+
 /** Subtle high-tech hover blip */
 export function playHover() {
+    if (isMuted) return
     try {
         const c = getCtx()
         const osc = c.createOscillator()
@@ -34,6 +45,7 @@ export function playHover() {
 
 /** Room click / selection — deeper confirmation tone */
 export function playSelect() {
+    if (isMuted) return
     try {
         const c = getCtx()
         const osc = c.createOscillator()
@@ -59,6 +71,7 @@ export function playSelect() {
 
 /** Power-down whoosh — descending noise sweep */
 export function playPowerDown() {
+    if (isMuted) return
     try {
         const c = getCtx()
         const osc = c.createOscillator()
@@ -76,6 +89,7 @@ export function playPowerDown() {
 
 /** Power-up ascending chime */
 export function playPowerUp() {
+    if (isMuted) return
     try {
         const c = getCtx()
         const osc = c.createOscillator()
@@ -93,6 +107,7 @@ export function playPowerUp() {
 
 /** Override toggle — two-tone alarm bleep */
 export function playOverride() {
+    if (isMuted) return
     try {
         const c = getCtx()
         const osc = c.createOscillator()
@@ -119,7 +134,7 @@ export function startAmbient() {
         const gain = c.createGain()
         osc.type = 'sine'
         osc.frequency.setValueAtTime(60, c.currentTime)
-        gain.gain.setValueAtTime(0.015, c.currentTime)
+        gain.gain.setValueAtTime(isMuted ? 0 : 0.015, c.currentTime)
         osc.connect(gain).connect(c.destination)
         osc.start()
         ambientNode = { osc, gain }

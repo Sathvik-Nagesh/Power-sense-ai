@@ -239,18 +239,47 @@ function CameraController({ selectedRoom }) {
     return null
 }
 
+// ─── Environment & Lighting Controller (Day/Night) ───
+function EnvironmentController({ simHour }) {
+    const { scene } = useThree()
+
+    // 6am to 6pm is dayish.
+    // Normalized to sun altitude: 1 at noon (hour 12), -1 at midnight (hour 0)
+    const sunHeight = Math.sin(((simHour - 6) / 24) * Math.PI * 2)
+    const factor = Math.max(0, sunHeight) // 0 to 1 during day, clamped at 0 for night
+
+    const targetBg = useMemo(() => new THREE.Color().lerpColors(
+        new THREE.Color('#010204'), // Night pitch-black sky
+        new THREE.Color('#05112a'), // Day bright-blue sky
+        factor
+    ), [factor])
+
+    const ambIntensity = 0.5 + factor * 1.5   // 0.5 night ... 2.0 day
+    const dirIntensity = 0.3 + factor * 2.5   // 0.3 night ... 2.8 day
+
+    useFrame(() => {
+        if (!scene.background) scene.background = new THREE.Color()
+        scene.background.lerp(targetBg, 0.05)
+    })
+
+    return (
+        <>
+            <ambientLight intensity={ambIntensity} color="#224488" />
+            <directionalLight position={[10, 10, 5]} intensity={dirIntensity} color="#00e5ff" />
+            <spotLight position={[0, 15, 0]} angle={0.8} penumbra={1} intensity={5} color="#00d68f" />
+        </>
+    )
+}
+
 // ─── Main Scene ───
-export default function CampusMap3D({ rooms, preds, onRoomClick, selectedRoom }) {
+export default function CampusMap3D({ rooms, preds, onRoomClick, selectedRoom, simHour = 12 }) {
     const roomMap = Object.fromEntries(rooms.map(r => [r.id, r]))
     const predMap = Object.fromEntries(preds.map(p => [p.room, p]))
 
     return (
         <Canvas camera={{ position: [0, 8, 12], fov: 60 }} gl={{ antialias: false }}>
-            <color attach="background" args={['#03050c']} />
 
-            <ambientLight intensity={1.5} color="#224488" />
-            <directionalLight position={[10, 10, 5]} intensity={2} color="#00e5ff" />
-            <spotLight position={[0, 15, 0]} angle={0.8} penumbra={1} intensity={5} color="#00d68f" />
+            <EnvironmentController simHour={simHour} />
 
             <Grid
                 args={[100, 100]}

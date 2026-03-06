@@ -5,7 +5,7 @@ import ClassroomCard from './components/ClassroomCard'
 import EnergyDashboard from './components/EnergyDashboard'
 import EnergyHeatmap from './components/EnergyHeatmap'
 import AlertTicker from './components/AlertTicker'
-import { playOverride, playPowerDown, playPowerUp, startAmbient } from './utils/audio'
+import { playOverride, playPowerDown, playPowerUp, startAmbient, setMuteState } from './utils/audio'
 
 const API = 'http://localhost:8000/api'
 
@@ -38,6 +38,7 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [expanded, setExpanded] = useState(null)
+  const [isMuted, setIsMuted] = useState(false)
   const timerRef = useRef(null)
 
   const fetchAll = useCallback(async () => {
@@ -126,6 +127,41 @@ export default function App() {
     }
   }, [])
 
+  const toggleMute = useCallback(() => {
+    const nm = !isMuted
+    setIsMuted(nm)
+    setMuteState(nm)
+  }, [isMuted])
+
+  const predMap = Object.fromEntries(preds.map(p => [p.room, p]))
+  const energyMap = Object.fromEntries(energy.map(e => [e.room, e]))
+
+  const exportCSV = useCallback(() => {
+    const rows = [
+      ["Room ID", "Status", "Student Count", "Power (kW)", "Efficiency (%)", "Mode"]
+    ]
+    rooms.forEach(r => {
+      const eData = energyMap[r.id] || {}
+      rows.push([
+        r.id,
+        r.status,
+        r.student_count,
+        r.current_power_kw,
+        eData.efficiency_pct?.toFixed(1) || 0,
+        r.override_active ? "Override" : "AI"
+      ])
+    })
+    rows.push([])
+    rows.push(["TOTALS", `Energy Saved: ${stats?.total_energy_saved_kwh?.toFixed(2)} kWh`, `CO2 Reduced: ${stats?.total_co2_reduced_kg?.toFixed(2)} kg`])
+
+    const csvData = rows.map(e => e.join(",")).join("\n")
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement("a")
+    link.href = URL.createObjectURL(blob)
+    link.download = `PowerSense_Audit_${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+  }, [rooms, energyMap, stats])
+
   useEffect(() => {
     if (isPlaying) {
       const ms = Math.max(700, 3000 / speed)
@@ -136,8 +172,7 @@ export default function App() {
     return () => clearInterval(timerRef.current)
   }, [isPlaying, speed, step])
 
-  const predMap = Object.fromEntries(preds.map(p => [p.room, p]))
-  const energyMap = Object.fromEntries(energy.map(e => [e.room, e]))
+
 
   const activeRooms = rooms.filter(r => r.is_occupied).length
 
@@ -150,6 +185,7 @@ export default function App() {
           preds={preds}
           onRoomClick={setExpanded}
           selectedRoom={expanded}
+          simHour={simHour}
         />
       </div>
 
@@ -204,6 +240,16 @@ export default function App() {
                 />
                 <span className="scrubber-value">{simHour}:00</span>
               </div>
+            </div>
+
+            {/* Utility Bar */}
+            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+              <button className="sim-bar__btn" onClick={toggleMute}>
+                {isMuted ? '🔇 Unmute' : '🔊 Mute'}
+              </button>
+              <button className="sim-bar__btn" onClick={exportCSV} style={{ color: '#00d68f', borderColor: 'rgba(0,214,143,0.3)' }}>
+                📥 Export CSV Audit
+              </button>
             </div>
           </div>
 
