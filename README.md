@@ -13,6 +13,7 @@
 
 ### 2. 🧠 AI Occupancy Prediction (Scikit-Learn)
 - A highly accurate **RandomForest Classifier** predicts if a room is occupied based on the hour, day of the week, timetable schedule, and real-time WiFi devices active.
+- **Trained on Real Data**: The model is trained on `campus_energy_data.csv`, a historical dataset representing actual campus patterns, allowing it to accurately predict real-world schedules rather than using hardcoded logic.
 - Analyzes current occupancy + a **30-minute lookahead prediction**.
 - Recommends one of three actions: `Keep Power On`, `Reduce Power` (AC/Fans OFF), or `Turn Off All`.
 
@@ -25,7 +26,8 @@
 ### 4. 🎛️ Tactical Data Overlays
 - **Floating HUD Glass Panels**: Overlapping the R3F scene.
 - **Neon LED Equalizer**: A cool CSS-based LED equalizer visualizing live power consumption per room against total capacity.
-- **Historical Busy Heatmap**: Toggle between live efficiency maps and historical schedule grids for 12-hour block insights.
+- **Efficiency Heatmap**: Displays accurate real-time energy efficiency percentages. The math is simple but effective: `100% - (current_power / max_possible_capacity)`. If the room is physically occupied but the AI turns off the AC, efficiency skyrockets!
+- **Historical Busy Heatmap**: Toggle between the live efficiency maps and historical schedule grids for 12-hour block insights.
 - **Faculty Override**: A manual toggle that forces the simulation to re-route energy back into a room, overriding the AI.
 
 ---

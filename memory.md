@@ -19,6 +19,7 @@ The system is a separated full-stack application.
    
 2. `model.py`
    - Scikit-Learn RandomForest implementation.
+   - **Trained on Dataset:** Uses `campus_energy_data.csv` (historical energy/occupancy logs) to fit the model so it learns real-world student behaviors.
    - Features: `[hour, day_of_week, scheduled_class, past_occupancy, wifi_devices]`.
    - Has two main functions: `predict()` and `predict_30min_ahead()`.
    
@@ -48,6 +49,8 @@ The frontend was massively overhauled into an Iron Man style **Holographic 3D Co
   - Uses `@react-three/drei`'s `<Html />` component for anchored 2D popups overlaid inside 3D space.
 - `components/EnergyDashboard.jsx`
   - React/CSS-based custom LED equalizer UI component visualising power consumption per grid room dynamically via neon blocks.
+- `components/EnergyHeatmap.jsx`
+  - Two modes: Live **Efficiency Heatmap** (which accurately calculates UI efficiency as `% power saved versus maximum possible draw`) and a **Busy Time** schedule block overview.
 - `components/ClassroomCard.jsx`
   - Complex dynamic cards found in the right-side grid overlay (Campus Sectors list).
   - Conditionally renders inner UI elements like `<WifiSignal />` mini-bars, toggleable `Manual Overrides`, and live multi-colored recommendation tags.
@@ -61,7 +64,7 @@ The frontend was massively overhauled into an Iron Man style **Holographic 3D Co
 - **Layout Overlaps (`index.css`):**
   Initially, `.ui-header` and `.ui-charts` were absolutely grouped in corners, causing overlaps on short screens. They are now placed relative within a `pointer-events: none` `.ui-left` flex container with `justify-content: space-between` to always prevent grid crashes. Both are assigned `pointer-events: auto` explicitly. 
 - **Time Sync (`Simulate API`):**
-  When dragging the timeline scrubber in `App.jsx`, a `set_time` POST action updates the backend `simulation.py` clock manually allowing fluid scrubbing.
+  When dragging the timeline scrubber in `App.jsx`, a `set_time` POST action sends the current `{"hour": 14}` to the backend `simulation.py` clock manually, allowing instant frontend/backend timeline scrubbing without timezone bugs.
 
 ---
 
