@@ -717,3 +717,77 @@ button {
   opacity: .8;
   margin-top: 2px;
 }
+
+/* ===== 3D HTML TAGS ===== */
+.holo-tag {
+  background: var(--bg-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-hi);
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: var(--glow-cyan);
+  pointer-events: none;
+  width: max-content;
+  color: #fff;
+}
+
+.holo-tag__title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--c-cyan);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.holo-tag__stat {
+  font-size: 0.65rem;
+  margin-bottom: 2px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--t2);
+}
+
+/* ===== INTERACTIVE SCRUBBER ===== */
+.scrubber-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.scrubber-label {
+  font-size: 0.65rem;
+  color: var(--t3);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.scrubber-track {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+}
+
+.scrubber-track::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--c-cyan);
+  cursor: pointer;
+  box-shadow: var(--glow-cyan);
+}
+
+.scrubber-value {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--c-cyan);
+  min-width: 48px;
+}

@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Grid, Text, Edges, Line } from '@react-three/drei'
+import { OrbitControls, Grid, Text, Edges, Line, Html } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 
@@ -67,7 +67,7 @@ function PowerCore() {
 
 // -------------------------------------------------------------
 // Animated Energy Streams Hub -> Building
-function EnergyStream({ start, end, status }) {
+function EnergyStream({ start, end, room }) {
     const points = useMemo(() => {
         // A classic bezier curve to make lines jump up nicely
         const curve = new THREE.QuadraticBezierCurve3(
@@ -80,8 +80,9 @@ function EnergyStream({ start, end, status }) {
 
     const particleRef = useRef()
 
-    const isActive = status === 'occupied' || status === 'predicted_empty_soon'
-    const isWarn = status === 'predicted_empty_soon'
+    const status = room?.status || 'empty'
+    const isActive = status === 'occupied' || status === 'predicted_empty_soon' || room?.override_active
+    const isWarn = status === 'predicted_empty_soon' && !room?.override_active
 
     // Set up particle travel
     useFrame((state) => {
@@ -207,6 +208,17 @@ function Building({ data, room, pred, onClick, isSelected }) {
                     ⚠ OVERRIDE
                 </Text>
             )}
+            {/* Floating HTML UI Tag */}
+            {(hovered || isSelected) && room && (
+                <Html position={[0, 2.5, 0]} center zIndexRange={[100, 0]}>
+                    <div className="holo-tag">
+                        <div className="holo-tag__title">{data.id} - {room.status}</div>
+                        <div className="holo-tag__stat">👤 {room.student_count} Students</div>
+                        <div className="holo-tag__stat">⚡ {room.current_power_kw.toFixed(1)} kW</div>
+                        <div className="holo-tag__stat">📶 {room.wifi_devices} Devices</div>
+                    </div>
+                </Html>
+            )}
         </group>
     )
 }
@@ -252,7 +264,7 @@ export default function CampusMap3D({ rooms, preds, onRoomClick, selectedRoom })
                         <EnergyStream
                             start={HUB_POS}
                             end={cfg.pos}
-                            status={room?.status}
+                            room={room}
                         />
                     </React.Fragment>
                 )

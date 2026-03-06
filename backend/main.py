@@ -52,8 +52,9 @@ class OverrideRequest(BaseModel):
 
 
 class SimulationControl(BaseModel):
-    action: str  # "play", "pause", "step", "reset"
+    action: str  # "play", "pause", "step", "reset", "set_time"
     speed: Optional[int] = 1
+    time_iso: Optional[str] = None
 
 
 # --- API Endpoints ---
@@ -129,6 +130,10 @@ def simulate_step(control: Optional[SimulationControl] = None):
         elif control.action == "reset":
             simulation.__init__()
             simulation.step()
+        elif control.action == "set_time" and control.time_iso:
+            from datetime import datetime
+            simulation.current_time = datetime.fromisoformat(control.time_iso)
+            simulation.step() # force one step to update the rooms state at the new time
         if control.speed:
             simulation.speed = control.speed
     else:

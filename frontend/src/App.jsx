@@ -95,6 +95,20 @@ export default function App() {
     } catch (e) { }
   }, [fetchAll])
 
+  const setTime = useCallback(async (hours) => {
+    // Reset date to today at specific hour
+    const d = new Date()
+    d.setHours(hours, 0, 0, 0)
+    try {
+      await fetch(`${API}/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_time', time_iso: d.toISOString() }),
+      })
+      fetchAll()
+    } catch (e) { }
+  }, [fetchAll])
+
   useEffect(() => { fetchAll() }, [fetchAll])
 
   useEffect(() => {
@@ -156,6 +170,24 @@ export default function App() {
                   {s}×
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Interactive Timeline Scrubber */}
+          <div className="glass-panel" style={{ marginTop: 12, padding: '10px 14px', width: 'fit-content' }}>
+            <div className="scrubber-container">
+              <span className="scrubber-label">Timeline</span>
+              <input
+                type="range"
+                className="scrubber-track"
+                min="7" max="23" step="1"
+                value={simHour}
+                onChange={(e) => {
+                  setSimHour(parseInt(e.target.value))
+                  setTime(parseInt(e.target.value))
+                }}
+              />
+              <span className="scrubber-value">{simHour}:00</span>
             </div>
           </div>
         </div>
