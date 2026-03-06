@@ -12,7 +12,12 @@ from model import predict, predict_30min_ahead
 
 class SimulationEngine:
     def __init__(self):
-        self.current_time = datetime.now().replace(hour=7, minute=0, second=0)
+        # Always simulate a weekday (Monday 9am) so campus is busy for demos
+        now = datetime.now()
+        # Find most recent Monday (weekday 0), or keep today if Mon-Fri
+        days_since_monday = now.weekday() if now.weekday() < 5 else 0
+        monday = now - timedelta(days=days_since_monday)
+        self.current_time = monday.replace(hour=9, minute=0, second=0, microsecond=0)
         self.is_running = False
         self.speed = 1  # 1x, 2x, 4x
         self.step_minutes = 15
@@ -44,8 +49,8 @@ class SimulationEngine:
             }
 
     def step(self):
-        """Advance simulation by one step."""
-        self.current_time += timedelta(minutes=self.step_minutes)
+        """Advance simulation by one step, respecting speed multiplier."""
+        self.current_time += timedelta(minutes=self.step_minutes * self.speed)
 
         # Wrap around to next day if past midnight
         if self.current_time.hour == 0 and self.current_time.minute == 0:
@@ -221,15 +226,39 @@ class SimulationEngine:
         for room in ROOMS:
             rid = room["id"]
             state = self.room_states[rid]
+
+            # Derive how many minutes until predicted empty.
+            # If currently occupied and 30-min pred drops below 0.3 → ~30 min away.
+            # If currently occupied and now pred already low → ~10 min away.
+            # Otherwise no upcoming power-down expected.
+            pred_now = state["predicted_occupancy"]
+            pred_30 = state["predicted_30min"]
+            is_occ = state["is_occupied"]
+
+            if is_occ and pred_30 < 0.3 and pred_now >= 0.3:
+                # Interpolate: how far between "now" and "30 min" does it cross 0.3?
+                # Linear interpolation gives minutes to crossing
+                frac = (pred_now - 0.3) / max(pred_now - pred_30, 0.01)
+                predicted_empty_minutes = round(frac * 30)
+                prediction_probability = round(1 - pred_30, 2)
+            elif is_occ and pred_now < 0.3:
+                predicted_empty_minutes = 5   # already almost there
+                prediction_probability = round(1 - pred_now, 2)
+            else:
+                predicted_empty_minutes = None
+                prediction_probability = round(pred_now, 2)
+
             predictions.append({
                 "room": rid,
                 "room_name": room["name"],
-                "predicted_occupancy": state["predicted_occupancy"],
-                "predicted_occupancy_30min": state["predicted_30min"],
+                "predicted_occupancy": pred_now,
+                "predicted_occupancy_30min": pred_30,
                 "status": state["status"],
                 "recommendation": state.get("recommendation", "keep_power_on"),
                 "student_count": state["student_count"],
                 "wifi_devices": state["wifi_devices"],
+                "predicted_empty_minutes": predicted_empty_minutes,
+                "prediction_probability": prediction_probability,
             })
         return predictions
 

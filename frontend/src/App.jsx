@@ -5,6 +5,7 @@ import ClassroomCard from './components/ClassroomCard'
 import EnergyDashboard from './components/EnergyDashboard'
 import EnergyHeatmap from './components/EnergyHeatmap'
 import AlertTicker from './components/AlertTicker'
+import AiForecastPanel from './components/AiForecastPanel'
 import { playOverride, playPowerDown, playPowerUp, startAmbient, setMuteState } from './utils/audio'
 
 const API = 'http://localhost:8000/api'
@@ -299,6 +300,9 @@ export default function App() {
             </div>
           </div>
         </div>
+
+        {/* AI FORECAST PANEL — floats above the right room column */}
+        <AiForecastPanel preds={preds} simHour={simHour} />
 
         {/* RIGHT PANEL - Floating Room List */}
         <div className="ui-rooms panel glass-panel">

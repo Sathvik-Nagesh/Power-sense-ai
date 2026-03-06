@@ -6,7 +6,7 @@ import * as THREE from 'three'
 import gsap from 'gsap'
 import { playHover, playSelect } from '../utils/audio'
 
-// 3D positions for each building
+// ─── Room Layout ───
 const ROOMS_CFG = [
     { id: 'A101', pos: [-6, 0.5, -3] },
     { id: 'A202', pos: [-6, 0.5, 0] },
@@ -20,21 +20,31 @@ const ROOMS_CFG = [
 
 const HUB_POS = [0, 0.5, 5]
 
-const getStatusColor = (status) => {
-    if (status === 'occupied') return '#00d68f'
-    if (status === 'predicted_empty_soon') return '#ffb300'
-    return '#1e3a8a'
+// Status → base color
+const STATUS_COLOR = {
+    occupied: '#00d68f',
+    predicted_empty_soon: '#ffb300',
+    empty: '#1e3a8a',
 }
 
-// ─── Central Power Core ───
-function PowerCore() {
+// ─── Power Core ───
+function PowerCore({ hasPredictions }) {
     const ringsRef = useRef()
     const coreRef = useRef()
+    const waveRef = useRef()
+    const waveActive = useRef(false)
 
     useFrame((state, delta) => {
         if (ringsRef.current) ringsRef.current.rotation.y += delta * 0.5
         if (coreRef.current) {
             coreRef.current.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 2) * 0.1)
+        }
+        // Prediction-wave ring: tight small pulse around the hub
+        if (waveRef.current && hasPredictions) {
+            const t = state.clock.elapsedTime % 2.5  // faster 2.5s loop
+            const s = 1 + t * 2.0                    // max scale 3x (was 7x)
+            waveRef.current.scale.setScalar(s)
+            waveRef.current.material.opacity = Math.max(0, 0.25 - t * 0.1) // much more subtle
         }
     })
 
@@ -54,6 +64,15 @@ function PowerCore() {
                     <meshBasicMaterial color={[0, 1.5, 2.5]} toneMapped={false} side={THREE.DoubleSide} />
                 </mesh>
             </group>
+
+            {/* Expanding prediction wave ring */}
+            {hasPredictions && (
+                <mesh ref={waveRef} rotation={[Math.PI / 2, 0, 0]}>
+                    <ringGeometry args={[0.9, 1.0, 48]} />
+                    <meshBasicMaterial color={[2, 1.2, 0]} toneMapped={false} transparent side={THREE.DoubleSide} />
+                </mesh>
+            )}
+
             <Text position={[0, 2, 0]} fontSize={0.3} color="#00e5ff" anchorY="bottom" outlineWidth={0.02} outlineColor="#000">
                 POWER HUB
             </Text>
@@ -66,7 +85,11 @@ function EnergyStream({ start, end, room }) {
     const points = useMemo(() => {
         const curve = new THREE.QuadraticBezierCurve3(
             new THREE.Vector3(...start),
-            new THREE.Vector3((start[0] + end[0]) / 2, Math.max(start[1], end[1]) + 2, (start[2] + end[2]) / 2),
+            new THREE.Vector3(
+                (start[0] + end[0]) / 2,
+                Math.max(start[1], end[1]) + 2,
+                (start[2] + end[2]) / 2
+            ),
             new THREE.Vector3(...end)
         )
         return curve.getPoints(50)
@@ -74,78 +97,120 @@ function EnergyStream({ start, end, room }) {
 
     const particleRef = useRef()
     const status = room?.status || 'empty'
-    const isActive = status === 'occupied' || status === 'predicted_empty_soon' || room?.override_active
-    const isWarn = status === 'predicted_empty_soon' && !room?.override_active
+    const isPredEmpty = status === 'predicted_empty_soon' && !room?.override_active
+    const isActive = status === 'occupied' || isPredEmpty || room?.override_active
+
+    // Speed: slow down when predicted empty
+    const speed = isPredEmpty ? 0.25 : 1.0
 
     useFrame((state) => {
         if (!particleRef.current || !isActive) return
-        const t = ((state.clock.elapsedTime * (isWarn ? 0.3 : 1)) % 1)
+        const t = (state.clock.elapsedTime * speed) % 1
         const idx = Math.floor(t * 49)
         const p1 = points[idx]
         const p2 = points[idx + 1]
         if (p1 && p2) particleRef.current.position.lerpVectors(p1, p2, (t * 49) % 1)
     })
 
-    let lineColor = '#004466'
-    if (isActive) lineColor = '#00e5ff'
-    if (isWarn) lineColor = '#ffb300'
+    const lineColor = isPredEmpty ? '#ffb300' : isActive ? '#00e5ff' : '#004466'
+    const lineOpacity = isPredEmpty ? 0.25 : isActive ? 0.4 : 0.1
 
     return (
         <group>
-            <Line points={points} color={lineColor} opacity={isActive ? 0.4 : 0.1} transparent lineWidth={1.5} />
+            <Line points={points} color={lineColor} opacity={lineOpacity} transparent lineWidth={isPredEmpty ? 1 : 1.5} />
             {isActive && (
                 <mesh ref={particleRef}>
-                    <sphereGeometry args={[0.08, 8, 8]} />
-                    <meshBasicMaterial color={isWarn ? [2, 1.5, 0] : [0, 2, 3]} toneMapped={false} />
+                    <sphereGeometry args={[isPredEmpty ? 0.05 : 0.08, 8, 8]} />
+                    <meshBasicMaterial
+                        color={isPredEmpty ? [1.8, 0.9, 0] : [0, 2, 3]}
+                        toneMapped={false}
+                    />
                 </mesh>
             )}
         </group>
     )
 }
 
+// ─── Prediction Pulse Ring (around building) ───
+function PredictionPulse({ color }) {
+    const ringRef = useRef()
+    useFrame((state) => {
+        if (!ringRef.current) return
+        const t = (state.clock.elapsedTime * 0.7) % 1
+        ringRef.current.scale.setScalar(1 + t * 1.2)
+        ringRef.current.material.opacity = Math.max(0, 0.5 - t * 0.5)
+    })
+    return (
+        <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+            <ringGeometry args={[1.8, 2.0, 32]} />
+            <meshBasicMaterial color={color} transparent side={THREE.DoubleSide} />
+        </mesh>
+    )
+}
+
 // ─── Building Block ───
 function Building({ data, room, pred, onClick, isSelected }) {
     const groupRef = useRef()
+    const matRef = useRef()
+    const edgesRef = useRef()
     const [hovered, setHover] = useState(false)
 
     const status = room?.status || 'empty'
-    const baseColor = getStatusColor(status)
-    const glowColor = new THREE.Color(baseColor)
-    if (status === 'occupied') glowColor.multiplyScalar(2)
-    else if (status === 'empty') glowColor.multiplyScalar(0.7)
+    const isPredEmpty = status === 'predicted_empty_soon' && !room?.override_active
+    const isOcc = status === 'occupied'
+    const baseColor = STATUS_COLOR[status] || STATUS_COLOR.empty
+
+    const glowColor = useMemo(() => {
+        const c = new THREE.Color(baseColor)
+        if (isOcc) c.multiplyScalar(2)
+        else if (!isPredEmpty) c.multiplyScalar(0.7)
+        return c
+    }, [baseColor, isOcc, isPredEmpty])
 
     useFrame((state) => {
         if (!groupRef.current) return
-        const time = state.clock.elapsedTime
-        const offset = data.pos[0] * 0.1
-        groupRef.current.position.y = data.pos[1] + (hovered ? 0.4 : Math.sin(time * 2 + offset) * 0.1)
+        const t = state.clock.elapsedTime
+        const off = data.pos[0] * 0.1
+        groupRef.current.position.y = data.pos[1] + (hovered ? 0.4 : Math.sin(t * 2 + off) * 0.1)
+
+        // Amber pulse for predicted-empty rooms
+        if (matRef.current && isPredEmpty) {
+            matRef.current.emissiveIntensity = 0.2 + Math.sin(t * 1.5) * 0.18
+        }
     })
 
-    const isOcc = status === 'occupied'
     const students = isOcc ? Math.min(10, Math.ceil((room?.student_count || 1) / 5)) : 0
+    const emissiveIntensity = hovered ? 0.5 : (isOcc ? 0.3 : isPredEmpty ? 0.3 : 0.05)
 
     return (
-        <group position={data.pos} ref={groupRef}
+        <group
+            position={data.pos}
+            ref={groupRef}
             onClick={onClick}
             onPointerOver={() => { setHover(true); playHover() }}
-            onPointerOut={() => setHover(false)}>
-
-            {/* Light pillar */}
+            onPointerOut={() => setHover(false)}
+        >
+            {/* Ground light pillar */}
             <mesh position={[0, -0.5, 0]}>
                 <cylinderGeometry args={[1.5, 1.5, 1, 32]} />
                 <meshBasicMaterial color={baseColor} transparent opacity={hovered ? 0.2 : 0.05} depthWrite={false} />
             </mesh>
 
+            {/* Prediction pulse rings */}
+            {isPredEmpty && <PredictionPulse color={baseColor} />}
+
             {/* Building body */}
             <mesh>
                 <boxGeometry args={[3, 1.5, 2]} />
                 <meshStandardMaterial
-                    color={hovered ? baseColor : "#050a1f"}
+                    ref={matRef}
+                    color={hovered ? baseColor : '#050a1f'}
                     emissive={baseColor}
-                    emissiveIntensity={hovered ? 0.5 : (isOcc ? 0.3 : 0.05)}
-                    transparent opacity={0.6}
+                    emissiveIntensity={emissiveIntensity}
+                    transparent
+                    opacity={0.6}
                 />
-                <Edges linewidth={hovered || isSelected ? 3 : 1} threshold={15} color={glowColor} />
+                <Edges linewidth={hovered || isSelected ? 3 : isPredEmpty ? 2 : 1} threshold={15} color={glowColor} />
             </mesh>
 
             {/* Student particles */}
@@ -156,20 +221,25 @@ function Building({ data, room, pred, onClick, isSelected }) {
                 </mesh>
             ))}
 
-            {/* Labels */}
+            {/* Static text labels */}
             <Text position={[0, 1.5, 0]} fontSize={0.3} color="#fff" outlineWidth={0.02} outlineColor={baseColor}>
                 {data.id}
             </Text>
-            <Text position={[0, 1.1, 0]} fontSize={0.2} color={isOcc ? "#00e5ff" : "#888"} outlineWidth={0.01} outlineColor="#000">
+            <Text position={[0, 1.1, 0]} fontSize={0.2} color={isOcc ? '#00e5ff' : isPredEmpty ? '#ffb300' : '#888'} outlineWidth={0.01} outlineColor="#000">
                 ⚡ {(room?.current_power_kw || 0).toFixed(1)} kW
             </Text>
+            {isPredEmpty && pred?.predicted_empty_minutes != null && (
+                <Text position={[0, 1.9, 0]} fontSize={0.22} color="#ffb300" outlineWidth={0.01} outlineColor="#000">
+                    {`⚠ ~${pred.predicted_empty_minutes}min`}
+                </Text>
+            )}
             {room?.override_active && (
                 <Text position={[0, 1.9, 0]} fontSize={0.25} color="#ff7043" outlineWidth={0.01} outlineColor="#000">
                     ⚠ OVERRIDE
                 </Text>
             )}
 
-            {/* Floating HTML tag */}
+            {/* Floating HTML HUD tag */}
             {(hovered || isSelected) && room && (
                 <Html position={[0, 2.5, 0]} center zIndexRange={[100, 0]}>
                     <div className="holo-tag">
@@ -177,6 +247,12 @@ function Building({ data, room, pred, onClick, isSelected }) {
                         <div className="holo-tag__stat">👤 {room.student_count} Students</div>
                         <div className="holo-tag__stat">⚡ {room.current_power_kw?.toFixed(1)} kW</div>
                         <div className="holo-tag__stat">📶 {room.wifi_devices} Devices</div>
+                        {pred?.predicted_empty_minutes != null && (
+                            <div className="holo-tag__stat holo-tag__warn">
+                                ⚠ Power down in ~{pred.predicted_empty_minutes} min
+                                ({Math.round((pred.prediction_probability ?? 0) * 100)}% confident)
+                            </div>
+                        )}
                     </div>
                 </Html>
             )}
@@ -184,88 +260,43 @@ function Building({ data, room, pred, onClick, isSelected }) {
     )
 }
 
-// ─── Camera Fly-To Controller (GSAP) ───
+// ─── Camera Fly-To ───
 function CameraController({ selectedRoom }) {
     const { camera } = useThree()
-    const controlsRef = useRef()
     const prevSelected = useRef(null)
-
-    // Get a reference to OrbitControls via context
     const controls = useThree(state => state.controls)
 
     useEffect(() => {
         if (!selectedRoom || selectedRoom === prevSelected.current || !controls) return
         prevSelected.current = selectedRoom
-
         const cfg = ROOMS_CFG.find(r => r.id === selectedRoom)
         if (!cfg) return
-
         playSelect()
-
-        // Calculate camera target: slightly above and in front of the building
-        const targetPos = {
-            x: cfg.pos[0],
-            y: cfg.pos[1] + 1,
-            z: cfg.pos[2]
-        }
-
-        // Camera will orbit to a position offset from the building
-        const camTarget = {
-            x: cfg.pos[0] + 3,
-            y: cfg.pos[1] + 5,
-            z: cfg.pos[2] + 6
-        }
-
-        // GSAP tween the camera position
-        gsap.to(camera.position, {
-            x: camTarget.x,
-            y: camTarget.y,
-            z: camTarget.z,
-            duration: 1.2,
-            ease: 'power2.inOut',
-        })
-
-        // GSAP tween the orbit target
-        gsap.to(controls.target, {
-            x: targetPos.x,
-            y: targetPos.y,
-            z: targetPos.z,
-            duration: 1.2,
-            ease: 'power2.inOut',
-            onUpdate: () => controls.update(),
-        })
+        gsap.to(camera.position, { x: cfg.pos[0] + 3, y: cfg.pos[1] + 5, z: cfg.pos[2] + 6, duration: 1.2, ease: 'power2.inOut' })
+        gsap.to(controls.target, { x: cfg.pos[0], y: cfg.pos[1] + 1, z: cfg.pos[2], duration: 1.2, ease: 'power2.inOut', onUpdate: () => controls.update() })
     }, [selectedRoom, camera, controls])
 
     return null
 }
 
-// ─── Environment & Lighting Controller (Day/Night) ───
+// ─── Day/Night Lighting ───
 function EnvironmentController({ simHour }) {
     const { scene } = useThree()
-
-    // 6am to 6pm is dayish.
-    // Normalized to sun altitude: 1 at noon (hour 12), -1 at midnight (hour 0)
     const sunHeight = Math.sin(((simHour - 6) / 24) * Math.PI * 2)
-    const factor = Math.max(0, sunHeight) // 0 to 1 during day, clamped at 0 for night
-
+    const factor = Math.max(0, sunHeight)
     const targetBg = useMemo(() => new THREE.Color().lerpColors(
-        new THREE.Color('#010204'), // Night pitch-black sky
-        new THREE.Color('#05112a'), // Day bright-blue sky
+        new THREE.Color('#010204'),
+        new THREE.Color('#05112a'),
         factor
     ), [factor])
-
-    const ambIntensity = 0.5 + factor * 1.5   // 0.5 night ... 2.0 day
-    const dirIntensity = 0.3 + factor * 2.5   // 0.3 night ... 2.8 day
-
     useFrame(() => {
         if (!scene.background) scene.background = new THREE.Color()
         scene.background.lerp(targetBg, 0.05)
     })
-
     return (
         <>
-            <ambientLight intensity={ambIntensity} color="#224488" />
-            <directionalLight position={[10, 10, 5]} intensity={dirIntensity} color="#00e5ff" />
+            <ambientLight intensity={0.5 + factor * 1.5} color="#224488" />
+            <directionalLight position={[10, 10, 5]} intensity={0.3 + factor * 2.5} color="#00e5ff" />
             <spotLight position={[0, 15, 0]} angle={0.8} penumbra={1} intensity={5} color="#00d68f" />
         </>
     )
@@ -276,9 +307,10 @@ export default function CampusMap3D({ rooms, preds, onRoomClick, selectedRoom, s
     const roomMap = Object.fromEntries(rooms.map(r => [r.id, r]))
     const predMap = Object.fromEntries(preds.map(p => [p.room, p]))
 
+    const hasPredictions = preds.some(p => p.predicted_empty_minutes != null)
+
     return (
         <Canvas camera={{ position: [0, 8, 12], fov: 60 }} gl={{ antialias: false }}>
-
             <EnvironmentController simHour={simHour} />
 
             <Grid
@@ -289,7 +321,7 @@ export default function CampusMap3D({ rooms, preds, onRoomClick, selectedRoom, s
                 position={[0, 0, 0]}
             />
 
-            <PowerCore />
+            <PowerCore hasPredictions={hasPredictions} />
 
             {ROOMS_CFG.map(cfg => {
                 const room = roomMap[cfg.id]

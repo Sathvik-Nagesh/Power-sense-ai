@@ -121,6 +121,10 @@ def get_stats():
 def simulate_step(control: Optional[SimulationControl] = None):
     """Advance simulation or control playback."""
     if control:
+        # Apply speed first so subsequent step() uses new multiplier
+        if control.speed:
+            simulation.speed = control.speed
+
         if control.action == "step":
             simulation.step()
         elif control.action == "play":
@@ -128,16 +132,18 @@ def simulate_step(control: Optional[SimulationControl] = None):
             simulation.step()
         elif control.action == "pause":
             simulation.is_running = False
+        elif control.action == "reset":
+            simulation.__init__()
         elif control.action == "set_time":
+            old_speed = simulation.speed
+            simulation.speed = 1  # scrub exactly 1 step worth
             if control.hour is not None:
                 simulation.current_time = simulation.current_time.replace(hour=control.hour, minute=0, second=0)
-                simulation.step()
             elif control.time_iso:
                 from datetime import datetime
                 simulation.current_time = datetime.fromisoformat(control.time_iso)
-                simulation.step()
-        if control.speed:
-            simulation.speed = control.speed
+            simulation.step()
+            simulation.speed = old_speed  # restore
     else:
         simulation.step()
 
