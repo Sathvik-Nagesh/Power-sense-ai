@@ -140,100 +140,101 @@ export default function App() {
 
       {/* OVERLAY UI (React DOM) */}
       <div className="ui-overlay">
+        <div className="ui-left">
+          {/* TOP LEFT - Header & Controls */}
+          <div className="ui-header flex-col">
+            <div className="logo-wrap">
+              <div className="logo-icon">⚡</div>
+              <div className="logo-text">
+                <h1>PowerSense AI</h1>
+                <div className="tagline">Holographic Command Area</div>
+              </div>
+            </div>
 
-        {/* TOP LEFT - Header & Controls */}
-        <div className="ui-header flex-col">
-          <div className="logo-wrap">
-            <div className="logo-icon">⚡</div>
-            <div className="logo-text">
-              <h1>PowerSense AI</h1>
-              <div className="tagline">Holographic Command Area</div>
+            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+              <div className="ai-pill"><span className="blink" />AI Core Online</div>
+              <div className="clock-pill">{fmt(curTime)}</div>
+            </div>
+
+            <div className="sim-bar glass-panel" style={{ marginTop: 16, width: 'fit-content' }}>
+              <button className={`sim-bar__btn play ${isPlaying ? 'active' : ''}`} onClick={() => setIsPlaying(p => !p)}>
+                {isPlaying ? '⏸ Pause' : '▶ Play'}
+              </button>
+              <button className="sim-bar__btn" onClick={step} disabled={isPlaying}>⏭ Step</button>
+              <button className="sim-bar__btn" onClick={reset}>↺ Reset</button>
+              <div className="sim-bar__divider" />
+              <span className="sim-bar__label">Speed</span>
+              <div className="speed-group">
+                {[1, 2, 4].map(s => (
+                  <button key={s} className={`speed-btn ${speed === s ? 'active' : ''}`} onClick={() => setSpeed(s)}>
+                    {s}×
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Interactive Timeline Scrubber */}
+            <div className="glass-panel" style={{ marginTop: 12, padding: '10px 14px', width: 'fit-content' }}>
+              <div className="scrubber-container">
+                <span className="scrubber-label">Timeline</span>
+                <input
+                  type="range"
+                  className="scrubber-track"
+                  min="7" max="23" step="1"
+                  value={simHour}
+                  onChange={(e) => {
+                    setSimHour(parseInt(e.target.value))
+                    setTime(parseInt(e.target.value))
+                  }}
+                />
+                <span className="scrubber-value">{simHour}:00</span>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-            <div className="ai-pill"><span className="blink" />AI Core Online</div>
-            <div className="clock-pill">{fmt(curTime)}</div>
-          </div>
-
-          <div className="sim-bar glass-panel" style={{ marginTop: 16, width: 'fit-content' }}>
-            <button className={`sim-bar__btn play ${isPlaying ? 'active' : ''}`} onClick={() => setIsPlaying(p => !p)}>
-              {isPlaying ? '⏸ Pause' : '▶ Play'}
-            </button>
-            <button className="sim-bar__btn" onClick={step} disabled={isPlaying}>⏭ Step</button>
-            <button className="sim-bar__btn" onClick={reset}>↺ Reset</button>
-            <div className="sim-bar__divider" />
-            <span className="sim-bar__label">Speed</span>
-            <div className="speed-group">
-              {[1, 2, 4].map(s => (
-                <button key={s} className={`speed-btn ${speed === s ? 'active' : ''}`} onClick={() => setSpeed(s)}>
-                  {s}×
-                </button>
-              ))}
+          {/* TOP RIGHT - Stats Strip (Vertical or Grid) */}
+          <div className="ui-stats">
+            <div className="stat-tile glass-panel s-energy">
+              <div className="stat-tile__icon">🔋</div>
+              <div className="stat-tile__label">Energy Saved</div>
+              <div className="stat-tile__val">{stats?.total_energy_saved_kwh?.toFixed(1) ?? '0.0'}</div>
+              <div className="stat-tile__sub">kWh today</div>
+            </div>
+            <div className="stat-tile glass-panel s-cost">
+              <div className="stat-tile__icon">💰</div>
+              <div className="stat-tile__label">Cost Saved</div>
+              <div className="stat-tile__val">₹{stats?.total_cost_saved?.toFixed(0) ?? '0'}</div>
+            </div>
+            <div className="stat-tile glass-panel s-co2">
+              <div className="stat-tile__icon">🌿</div>
+              <div className="stat-tile__label">CO₂ Reduced</div>
+              <div className="stat-tile__val">{stats?.total_co2_reduced_kg?.toFixed(1) ?? '0.0'}</div>
+            </div>
+            <div className="stat-tile glass-panel s-rooms">
+              <div className="stat-tile__icon">🏫</div>
+              <div className="stat-tile__label">Optimized</div>
+              <div className="stat-tile__val">{stats?.rooms_optimized ?? 0}/8</div>
             </div>
           </div>
 
-          {/* Interactive Timeline Scrubber */}
-          <div className="glass-panel" style={{ marginTop: 12, padding: '10px 14px', width: 'fit-content' }}>
-            <div className="scrubber-container">
-              <span className="scrubber-label">Timeline</span>
-              <input
-                type="range"
-                className="scrubber-track"
-                min="7" max="23" step="1"
-                value={simHour}
-                onChange={(e) => {
-                  setSimHour(parseInt(e.target.value))
-                  setTime(parseInt(e.target.value))
-                }}
-              />
-              <span className="scrubber-value">{simHour}:00</span>
+          {/* BOTTOM LEFT - Charts */}
+          <div className="ui-charts">
+            <div className="panel glass-panel">
+              <div className="panel__head">
+                <div className="panel__title"><span className="ico">📊</span>Live Consumption</div>
+              </div>
+              <div className="panel__body" style={{ width: 400 }}>
+                <EnergyDashboard energyUsage={energy} />
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* TOP RIGHT - Stats Strip (Vertical or Grid) */}
-        <div className="ui-stats">
-          <div className="stat-tile glass-panel s-energy">
-            <div className="stat-tile__icon">🔋</div>
-            <div className="stat-tile__label">Energy Saved</div>
-            <div className="stat-tile__val">{stats?.total_energy_saved_kwh?.toFixed(1) ?? '0.0'}</div>
-            <div className="stat-tile__sub">kWh today</div>
-          </div>
-          <div className="stat-tile glass-panel s-cost">
-            <div className="stat-tile__icon">💰</div>
-            <div className="stat-tile__label">Cost Saved</div>
-            <div className="stat-tile__val">₹{stats?.total_cost_saved?.toFixed(0) ?? '0'}</div>
-          </div>
-          <div className="stat-tile glass-panel s-co2">
-            <div className="stat-tile__icon">🌿</div>
-            <div className="stat-tile__label">CO₂ Reduced</div>
-            <div className="stat-tile__val">{stats?.total_co2_reduced_kg?.toFixed(1) ?? '0.0'}</div>
-          </div>
-          <div className="stat-tile glass-panel s-rooms">
-            <div className="stat-tile__icon">🏫</div>
-            <div className="stat-tile__label">Optimized</div>
-            <div className="stat-tile__val">{stats?.rooms_optimized ?? 0}/8</div>
-          </div>
-        </div>
-
-        {/* BOTTOM LEFT - Charts */}
-        <div className="ui-charts">
-          <div className="panel glass-panel">
-            <div className="panel__head">
-              <div className="panel__title"><span className="ico">📊</span>Live Consumption</div>
-            </div>
-            <div className="panel__body" style={{ width: 400 }}>
-              <EnergyDashboard energyUsage={energy} />
-            </div>
-          </div>
-
-          <div className="panel glass-panel" style={{ marginTop: 16 }}>
-            <div className="panel__head">
-              <div className="panel__title"><span className="ico">🌡️</span>Efficiency Heatmap</div>
-            </div>
-            <div className="panel__body" style={{ width: 400 }}>
-              <EnergyHeatmap energyUsage={energy} />
+            <div className="panel glass-panel" style={{ marginTop: 16 }}>
+              <div className="panel__head">
+                <div className="panel__title"><span className="ico">🌡️</span>Efficiency Heatmap</div>
+              </div>
+              <div className="panel__body" style={{ width: 400 }}>
+                <EnergyHeatmap energyUsage={energy} />
+              </div>
             </div>
           </div>
         </div>

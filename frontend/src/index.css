@@ -84,10 +84,26 @@ button {
 }
 
 /* Layout Zones */
-.ui-header {
+.ui-left {
   position: absolute;
   left: 32px;
   top: 32px;
+  bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  overflow-y: auto;
+  gap: 16px;
+  padding-right: 12px;
+}
+
+.ui-left::-webkit-scrollbar {
+  display: none;
+}
+
+.ui-header {
+  position: relative;
 }
 
 .ui-stats {
@@ -99,9 +115,8 @@ button {
 }
 
 .ui-charts {
-  position: absolute;
-  left: 32px;
-  bottom: 32px;
+  position: relative;
+  /* margin-top: auto; to push charts to bottom if space allows, but space-between does this */
 }
 
 .ui-rooms {
